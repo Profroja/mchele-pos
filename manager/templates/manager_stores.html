@@ -1,0 +1,165 @@
+{% extends 'manager_base.html' %}
+
+{% block title %}Stores{% endblock %}
+{% block nav_stores %}active{% endblock %}
+{% block page_title %}Store Management{% endblock %}
+
+{% block content %}
+    <div class="panel">
+        <div class="section-header">
+            <h2>Stores</h2>
+            <button class="btn-add" onclick="openStoreModal()">
+                <i class="fa fa-plus"></i> Add Store
+            </button>
+        </div>
+
+        <table class="staff-table">
+            <thead>
+                <tr>
+                    <th>S/n</th>
+                    <th>Name</th>
+                    <th>Location</th>
+                    <th>Phone</th>
+                    <th>Staff Count</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for store in stores %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td><strong>{{ store.name }}</strong></td>
+                    <td>{{ store.location|default:"-" }}</td>
+                    <td>{{ store.phone|default:"-" }}</td>
+                    <td>{{ store.staff.count }}</td>
+                    <td>
+                        {% if store.is_active %}
+                            <span class="status-active">Active</span>
+                        {% else %}
+                            <span class="status-inactive">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn-action edit" onclick="editStore({{ store.id }})"><i class="fa fa-pen"></i></button>
+                        <button class="btn-action delete" onclick="deleteStore({{ store.id }}, '{{ store.name }}')"><i class="fa fa-trash"></i></button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align:center; color:#9ca3af; padding:30px;">No stores yet. Click "Add Store" to create one.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Store Modal -->
+    <div class="modal-overlay" id="storeModal">
+        <div class="modal">
+            <h2 id="storeModalTitle">Create New Store</h2>
+            <form id="storeForm" method="post" action="{% url 'create_store' %}">
+                {% csrf_token %}
+                <input type="hidden" name="store_id" id="storeId">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" name="name" id="storeName" required>
+                </div>
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" name="location" id="storeLocation">
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="text" name="phone" id="storePhone">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeStoreModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function openStoreModal() {
+        document.getElementById('storeModalTitle').textContent = 'Create New Store';
+        document.getElementById('storeForm').reset();
+        document.getElementById('storeId').value = '';
+        document.getElementById('storeModal').classList.add('show');
+    }
+
+    function closeStoreModal() {
+        document.getElementById('storeModal').classList.remove('show');
+    }
+
+    document.getElementById('storeModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeStoreModal();
+        }
+    });
+
+    function editStore(id) {
+        fetch(`/get_store/${id}/`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('storeModalTitle').textContent = 'Edit Store';
+                document.getElementById('storeId').value = data.id;
+                document.getElementById('storeName').value = data.name;
+                document.getElementById('storeLocation').value = data.location;
+                document.getElementById('storePhone').value = data.phone;
+                document.getElementById('storeModal').classList.add('show');
+            })
+            .catch(() => {
+                Swal.fire('Error', 'Failed to load store data', 'error');
+            });
+    }
+
+    function deleteStore(id, name) {
+        Swal.fire({
+            title: 'Delete Store?',
+            text: `Are you sure you want to delete "${name}"?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, delete',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch(`/delete_store/${id}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire('Deleted!', data.message, 'success')
+                            .then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                })
+                .catch(() => {
+                    Swal.fire('Error', 'Failed to delete store', 'error');
+                });
+            }
+        });
+    }
+
+    {% if messages %}
+        {% for message in messages %}
+            Swal.fire({
+                icon: '{{ message.tags|default:"info" }}',
+                title: '{{ message }}',
+                showConfirmButton: false,
+                timer: 2500
+            });
+        {% endfor %}
+    {% endif %}
+</script>
+{% endblock %}

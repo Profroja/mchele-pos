@@ -1,0 +1,151 @@
+{% extends 'manager_base.html' %}
+{% load humanize %}
+
+{% block title %}Stock Management{% endblock %}
+{% block page_title %}Stock Management{% endblock %}
+
+{% block nav_stock %}active{% endblock %}
+
+{% block content %}
+    <div class="panel">
+        <div class="section-header">
+            <h2>Stock Management</h2>
+            <a href="{% url 'inventory_list' %}" class="btn-add"><i class="fa fa-plus"></i> Add Stock</a>
+        </div>
+
+        <!-- Filters -->
+        <form method="GET" action="{% url 'manager_stock' %}" style="display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; justify-content:center;">
+            <div>
+                <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:5px;">Store</label>
+                <select name="store_id" style="padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; min-width:180px;">
+                    <option value="">All Stores</option>
+                    {% for s in stores %}
+                        <option value="{{ s.id }}" {% if store_filter == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:5px;">Product Name</label>
+                <select name="product_name" style="padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; min-width:220px;">
+                    <option value="">All Products</option>
+                    {% for pn in product_names %}
+                        <option value="{{ pn }}" {% if product_name == pn %}selected{% endif %}>{{ pn }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:5px;">Weight (kg)</label>
+                <select name="weight" style="padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; min-width:180px;">
+                    <option value="">All Weights</option>
+                    {% for w in weights %}
+                        <option value="{{ w }}" {% if weight == w|stringformat:"s" %}selected{% endif %}>{{ w }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" style="padding:10px 20px; background:#f59e0b; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;"><i class="fa fa-filter"></i> Filter</button>
+            {% if product_name or weight or store_filter %}
+            <a href="{% url 'manager_stock' %}" style="padding:10px 16px; background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"><i class="fa fa-times"></i> Clear</a>
+            {% endif %}
+        </form>
+
+        <!-- Totals -->
+        <div style="display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap; justify-content:center;">
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+                <i class="fa fa-box" style="color:#059669; font-size:28px;"></i>
+                <div>
+                    <div style="font-size:13px; color:#6b7280;">Remain Stock</div>
+                    <div style="font-size:26px; font-weight:800; color:#059669;">{{ in_stock_count|intcomma }}</div>
+                </div>
+            </div>
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+                <i class="fa fa-shilling-sign" style="color:#059669; font-size:28px;"></i>
+                <div>
+                    <div style="font-size:13px; color:#6b7280;">Remained Value</div>
+                    <div style="font-size:26px; font-weight:800; color:#059669;">TSh {{ in_stock_value|intcomma }}</div>
+                </div>
+            </div>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+                <i class="fa fa-box-open" style="color:#dc2626; font-size:28px;"></i>
+                <div>
+                    <div style="font-size:13px; color:#6b7280;">Sold</div>
+                    <div style="font-size:26px; font-weight:800; color:#dc2626;">{{ sold_count|intcomma }}</div>
+                </div>
+            </div>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+                <i class="fa fa-money-bill-wave" style="color:#dc2626; font-size:28px;"></i>
+                <div>
+                    <div style="font-size:13px; color:#6b7280;">Sold Value</div>
+                    <div style="font-size:26px; font-weight:800; color:#dc2626;">TSh {{ sold_value|intcomma }}</div>
+                </div>
+            </div>
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+                <i class="fa fa-boxes-stacked" style="color:#2563eb; font-size:28px;"></i>
+                <div>
+                    <div style="font-size:13px; color:#6b7280;">Total Items</div>
+                    <div style="font-size:26px; font-weight:800; color:#2563eb;">{{ total_count|intcomma }}</div>
+                </div>
+            </div>
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+                <i class="fa fa-coins" style="color:#2563eb; font-size:28px;"></i>
+                <div>
+                    <div style="font-size:13px; color:#6b7280;">Total Value</div>
+                    <div style="font-size:26px; font-weight:800; color:#2563eb;">TSh {{ total_value|intcomma }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100%;">
+        <table class="staff-table" style="min-width:700px; border-collapse:collapse; width:100%;">
+            <thead>
+                <tr>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:center; background:#f9fafb;">S/n</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Barcode</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Product Name</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Weight (kg)</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Selling Price</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Store</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Status</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Created</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:center; background:#f9fafb;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pkg in packages %}
+                <tr>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; text-align:center;">{{ forloop.counter }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ pkg.barcode_value }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ pkg.product_name|default:"-" }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ pkg.weight }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; font-weight:600;">TSh {{ pkg.selling_price|intcomma }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ pkg.store.name|default:"<span style='color:#9ca3af;'>-</span>"|safe }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">
+                        {% if pkg.status == 'in_stock' %}
+                            <span class="status-active">In Stock</span>
+                        {% elif pkg.status == 'sold' %}
+                            <span class="status-inactive">Sold</span>
+                        {% elif pkg.status == 'damaged' %}
+                            <span style="color:#ea580c; font-weight:600;">Damaged</span>
+                        {% else %}
+                            <span style="color:#6b7280; font-weight:600;">Returned</span>
+                        {% endif %}
+                    </td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; white-space:nowrap;">{{ pkg.created_at|date:"d M Y" }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; text-align:center; white-space:nowrap;">
+                        <a href="{% url 'inventory_list' %}" class="btn-action edit" title="Edit"><i class="fa fa-pen"></i></a>
+                        <a href="{% url 'inventory_list' %}" class="btn-action" title="View" style="color:#2563eb;"><i class="fa fa-eye"></i></a>
+                        <a href="{% url 'inventory_list' %}" class="btn-action delete" title="Delete" style="color:#dc2626;"><i class="fa fa-trash"></i></a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="border:1px solid #d1d5db; padding:24px; text-align:center; color:#9ca3af;">
+                        No stock items found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+{% endblock %}

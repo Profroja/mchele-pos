@@ -1,0 +1,244 @@
+{% extends 'manager_base.html' %}
+{% load humanize %}
+
+{% block title %}Funga Hesabu{% endblock %}
+{% block page_title %}Funga Hesabu{% endblock %}
+
+{% block sidebar_nav %}
+{% if is_manager %}
+<a href="{% url 'dashboard' %}"><i class="fa fa-gauge-high"></i> Manager Dashboard</a>
+<a href="{% url 'manager_sales' %}"><i class="fa fa-receipt"></i> Sales</a>
+<a href="{% url 'manager_stock' %}"><i class="fa fa-boxes-stacked"></i> Stock</a>
+<a href="{% url 'stores' %}"><i class="fa fa-store"></i> Stores</a>
+<a href="{% url 'staff' %}"><i class="fa fa-user-tie"></i> Staff</a>
+<a href="{% url 'expenditure_list' %}"><i class="fa fa-money-bill-wave"></i> Expenditures</a>
+<a class="active" href="{% url 'funga_hesabu' %}"><i class="fa fa-lock"></i> Funga Hesabu</a>
+{% else %}
+<a href="{% url 'pos_dashboard' %}"><i class="fa fa-cash-register"></i> POS Dashboard</a>
+<a href="{% url 'sales_list' %}"><i class="fa fa-receipt"></i> Sales</a>
+<a href="{% url 'pos_stock_lookup' %}"><i class="fa fa-boxes-stacked"></i> Stock Lookup</a>
+<a href="{% url 'expenditure_list' %}"><i class="fa fa-money-bill-wave"></i> Expenditures</a>
+<a class="active" href="{% url 'funga_hesabu' %}"><i class="fa fa-lock"></i> Funga Hesabu</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+    <!-- Date & Store Filters -->
+    <div style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:20px; flex-wrap:wrap;">
+        <label style="font-size:14px; font-weight:600; color:#374151;">Date:</label>
+        <input type="date" id="hesabuDate" value="{{ selected_date }}" style="padding:8px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+        {% if is_manager %}
+        <label style="font-size:14px; font-weight:600; color:#374151;">Store:</label>
+        <select id="storeFilter" style="padding:8px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+            <option value="">All Stores</option>
+            {% for s in stores %}
+                <option value="{{ s.id }}" {% if store_filter == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <button type="button" onclick="applyDate()" style="padding:8px 20px; background:#f59e0b; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;"><i class="fa fa-filter"></i> View</button>
+        <button type="button" onclick="printHesabu()" style="padding:8px 20px; background:#2563eb; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;"><i class="fa fa-print"></i> Print</button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div style="display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; justify-content:center;">
+        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+            <i class="fa fa-receipt" style="color:#059669; font-size:28px;"></i>
+            <div>
+                <div style="font-size:13px; color:#6b7280;">Today's Sales</div>
+                <div style="font-size:26px; font-weight:800; color:#059669;">{{ sales_count }}</div>
+            </div>
+        </div>
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+            <i class="fa fa-cash-register" style="color:#2563eb; font-size:28px;"></i>
+            <div>
+                <div style="font-size:13px; color:#6b7280;">Sales Amount</div>
+                <div style="font-size:26px; font-weight:800; color:#2563eb;">TSh {{ sales_total|intcomma }}</div>
+            </div>
+        </div>
+        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+            <i class="fa fa-money-bill-wave" style="color:#dc2626; font-size:28px;"></i>
+            <div>
+                <div style="font-size:13px; color:#6b7280;">Expenditures</div>
+                <div style="font-size:26px; font-weight:800; color:#dc2626;">{{ exp_count }}</div>
+            </div>
+        </div>
+        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+            <i class="fa fa-arrow-down" style="color:#dc2626; font-size:28px;"></i>
+            <div>
+                <div style="font-size:13px; color:#6b7280;">Exp. Amount</div>
+                <div style="font-size:26px; font-weight:800; color:#dc2626;">TSh {{ exp_total|intcomma }}</div>
+            </div>
+        </div>
+        <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+            <i class="fa fa-scale-balanced" style="color:#7c3aed; font-size:28px;"></i>
+            <div>
+                <div style="font-size:13px; color:#6b7280;">Net (Sales - Exp.)</div>
+                <div style="font-size:26px; font-weight:800; color:#7c3aed;">TSh {{ net|intcomma }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sales Table -->
+    <div class="panel" style="margin-bottom:24px;">
+        <div class="section-header">
+            <h2>Sales - {{ selected_date }}</h2>
+        </div>
+        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+        <table class="staff-table" style="min-width:700px; border-collapse:collapse; width:100%;">
+            <thead>
+                <tr>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:center; background:#f9fafb;">S/n</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Receipt #</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Items</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Payment</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Time</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:right; background:#f9fafb;">Total Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in sales %}
+                <tr>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; text-align:center;">{{ forloop.counter }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;"><strong>{{ sale.receipt_number }}</strong></td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ sale.items.count }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ sale.get_payment_method_display }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; white-space:nowrap;">{{ sale.sale_date|date:"H:i" }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; text-align:right; font-weight:700; color:#059669;">TSh {{ sale.total_amount|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="border:1px solid #d1d5db; padding:24px; text-align:center; color:#9ca3af;">
+                        No sales recorded on this day.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if sales_count > 0 %}
+            <tfoot>
+                <tr style="background:#f9fafb;">
+                    <td colspan="5" style="border:1px solid #d1d5db; padding:10px 12px; text-align:right; font-weight:800; font-size:15px;">Total Sales:</td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px; text-align:right; font-weight:800; font-size:15px; color:#059669;">TSh {{ sales_total|intcomma }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+        </div>
+    </div>
+
+    <!-- Stock Sold Table -->
+    <div class="panel" style="margin-bottom:24px;">
+        <div class="section-header">
+            <h2>Stock Sold - {{ selected_date }}</h2>
+        </div>
+        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+        <table class="staff-table" style="min-width:800px; border-collapse:collapse; width:100%;">
+            <thead>
+                <tr>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:center; background:#f9fafb;">S/n</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Barcode</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Product Name</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Weight (kg)</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:right; background:#f9fafb;">Price</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Receipt #</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in sale_items %}
+                <tr>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; text-align:center;">{{ forloop.counter }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; font-size:12px; color:#6b7280;">{{ item.barcode_value }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ item.product_name|default:"-" }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ item.weight }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; text-align:right; font-weight:600;">TSh {{ item.selling_price|intcomma }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ item.sale.receipt_number }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; white-space:nowrap;">{{ item.sale.sale_date|date:"H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="border:1px solid #d1d5db; padding:24px; text-align:center; color:#9ca3af;">
+                        No stock sold on this day.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if items_count > 0 %}
+            <tfoot>
+                <tr style="background:#f9fafb;">
+                    <td colspan="3" style="border:1px solid #d1d5db; padding:10px 12px; text-align:right; font-weight:800;">Total Items: {{ items_count }}</td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px; text-align:left; font-weight:800;">{{ items_weight_total }} kg</td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px; text-align:right; font-weight:800; color:#059669;">TSh {{ items_value_total|intcomma }}</td>
+                    <td colspan="2"></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+        </div>
+    </div>
+
+    <!-- Expenditures Table -->
+    <div class="panel">
+        <div class="section-header">
+            <h2>Expenditures - {{ selected_date }}</h2>
+        </div>
+        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+        <table class="staff-table" style="min-width:600px; border-collapse:collapse; width:100%;">
+            <thead>
+                <tr>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:center; background:#f9fafb;">S/n</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Purpose</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Notes</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Recorded By</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Time</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:right; background:#f9fafb;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exp in expenditures %}
+                <tr>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; text-align:center;">{{ forloop.counter }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ exp.purpose }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; color:#6b7280;">{{ exp.notes|default:"-" }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ exp.created_by.username|default:"-" }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; white-space:nowrap;">{{ exp.created_at|date:"H:i" }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; text-align:right; font-weight:700; color:#dc2626;">TSh {{ exp.amount|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="border:1px solid #d1d5db; padding:24px; text-align:center; color:#9ca3af;">
+                        No expenditures recorded on this day.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if exp_count > 0 %}
+            <tfoot>
+                <tr style="background:#f9fafb;">
+                    <td colspan="5" style="border:1px solid #d1d5db; padding:10px 12px; text-align:right; font-weight:800; font-size:15px;">Total Expenditures:</td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px; text-align:right; font-weight:800; font-size:15px; color:#dc2626;">TSh {{ exp_total|intcomma }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function applyDate() {
+        const date = document.getElementById('hesabuDate').value;
+        let url = `{% url 'funga_hesabu' %}?date=${date}`;
+        {% if is_manager %}
+        const storeId = document.getElementById('storeFilter').value;
+        if (storeId) url += `&store_id=${storeId}`;
+        {% endif %}
+        window.location.href = url;
+    }
+
+    function printHesabu() {
+        window.print();
+    }
+</script>
+{% endblock %}

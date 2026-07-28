@@ -1,0 +1,10 @@
+{% extends 'manager_base.html' %}
+
+{% block title %}Inventory{% endblock %}
+{% block page_title %}Inventory Dashboard{% endblock %}
+
+{% block sidebar_nav %}
+<a href="{% url 'inventory_dashboard' %}"><i class="fa fa-boxes-stacked"></i> Inventory Dashboard</a>
+<a href="{% url 'inventory_list' %}"><i class="fa fa-box"></i> Stock</a>
+<a href="{% url 'stock_search' %}"><i class="fa fa-magnifying-glass"></i> Stock Search</a>
+{% endblock %}

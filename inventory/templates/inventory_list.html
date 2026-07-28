@@ -1,0 +1,557 @@
+{% extends 'inventory_base.html' %}
+{% load humanize %}
+
+{% block title %}Stock{% endblock %}
+{% block page_title %}Stock List{% endblock %}
+
+{% block sidebar_nav %}
+<a href="{% url 'inventory_dashboard' %}"><i class="fa fa-boxes-stacked"></i> Inventory Dashboard</a>
+<a class="active" href="{% url 'inventory_list' %}"><i class="fa fa-box"></i> Stock</a>
+<a href="{% url 'stock_search' %}"><i class="fa fa-magnifying-glass"></i> Stock Search</a>
+{% endblock %}
+
+{% block content %}
+    <div class="panel">
+        <div class="section-header">
+            <h2>Stock</h2>
+            <div class="section-actions">
+                <div class="search-bar" style="position: relative;">
+                    <i class="fa fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9ca3af;"></i>
+                    <input type="text" id="stockSearch" placeholder="Search barcode, product, weight..." style="padding: 8px 12px 8px 36px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; width: 260px;" oninput="filterStock()">
+                </div>
+                {% if is_manager %}
+                <select id="storeFilter" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;" onchange="applyStoreFilter()">
+                    <option value="">All Stores</option>
+                    {% for s in stores %}
+                        <option value="{{ s.id }}" {% if selected_store == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                <button class="btn-printer" id="printerBtn" onclick="connectPrinter()">
+                    <i class="fa fa-print"></i> <span id="printerLabel">Connect Printer</span>
+                </button>
+                <button class="btn-add" onclick="openModal()">
+                    <i class="fa fa-plus"></i> Add Stock
+                </button>
+            </div>
+        </div>
+
+        <div class="table-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%;">
+        <table class="staff-table" id="stockTable" style="min-width: 600px;">
+            <thead>
+                <tr>
+                    <th>S/n</th>
+                    <th>Barcode</th>
+                    <th>Product Name</th>
+                    <th>Weight (kg)</th>
+                    <th>Selling Price</th>
+                    <th>Store</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pkg in packages %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ pkg.barcode_value }}</td>
+                    <td>{{ pkg.product_name|default:"-" }}</td>
+                    <td>{{ pkg.weight }}</td>
+                    <td>TSh {{ pkg.selling_price|intcomma }}</td>
+                    <td>{{ pkg.store.name|default:"<span style='color:#9ca3af;'>-</span>"|safe }}</td>
+                    <td>
+                        {% if pkg.status == 'in_stock' %}
+                            <span class="status-active">In Stock</span>
+                        {% elif pkg.status == 'sold' %}
+                            <span class="status-inactive">Sold</span>
+                        {% elif pkg.status == 'damaged' %}
+                            <span style="color: #ea580c; font-weight: 600;">Damaged</span>
+                        {% else %}
+                            <span style="color: #6b7280; font-weight: 600;">Returned</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ pkg.created_at|date:"d M Y" }}</td>
+                    <td>
+                        <button class="btn-action edit" onclick="editPackage({{ pkg.id }})"><i class="fa fa-pen"></i></button>
+                        <button class="btn-action print" onclick="printBarcode('{{ pkg.barcode_value }}', '{{ pkg.weight }}', '{{ pkg.selling_price }}', '{{ pkg.product_name }}')" title="Print barcode"><i class="fa fa-print"></i></button>
+                        <button class="btn-action delete" onclick="deletePackage({{ pkg.id }}, '{{ pkg.barcode_value }}')"><i class="fa fa-trash"></i></button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr id="noResults" style="display: none;">
+                    <td colspan="9" style="text-align: center; color: #9ca3af; padding: 30px;">No matching stock found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    <!-- Create/Edit Package Modal -->
+    <div class="modal-overlay" id="packageModal">
+        <div class="modal">
+            <h2 id="modalTitle">Create New Package</h2>
+            <form id="packageForm">
+                {% csrf_token %}
+                <input type="hidden" name="package_id" id="packageId">
+                <input type="hidden" name="batch_number" id="batch_number" value="">
+                <input type="hidden" name="notes" id="notes" value="">
+                <div class="form-group">
+                    <label>Product Name</label>
+                    <input type="text" name="product_name" id="product_name" placeholder="Optional, e.g. Premium Rice">
+                </div>
+                <div class="form-group">
+                    <label>Weight (kg)</label>
+                    <input type="number" name="weight" id="weight" step="0.01" min="0.01" required placeholder="e.g. 1, 2, 5, 10, 25, 50">
+                </div>
+                <div class="form-group">
+                    <label>Selling Price (TSh)</label>
+                    <input type="number" name="selling_price" id="selling_price" step="0.01" min="0" required placeholder="e.g. 3500">
+                </div>
+                <div class="form-group">
+                    <label>Production Date</label>
+                    <input type="date" name="production_date" id="production_date">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select name="status" id="status">
+                        <option value="in_stock" selected>In Stock</option>
+                        <option value="sold">Sold</option>
+                        <option value="damaged">Damaged</option>
+                        <option value="returned">Returned</option>
+                    </select>
+                </div>
+                <div class="form-group" id="storeFormGroup">
+                    <label>Store</label>
+                    <select name="store_id" id="storeSelect">
+                        <option value="">-- Select Store --</option>
+                        {% for s in stores %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="modal-actions" style="justify-content: space-between; align-items: center;">
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; font-weight:600; color:#374151; white-space:nowrap;">
+                        <input type="checkbox" id="printAfterSave" checked> Print barcode after saving
+                    </label>
+                    <div style="display:flex; gap:12px;">
+                        <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                        <button type="submit" class="btn-primary">Save</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // ---- Dual Printer Support: Web Bluetooth (mobile) + Print Server (desktop) ----
+    const PRINT_SERVER_URL = 'http://localhost:5000';
+    let printerOnline = false;
+    let printerMode = null; // 'bluetooth' or 'server'
+    let printerDevice = null;
+    let printerCharacteristic = null;
+    let printerReconnecting = false;
+
+    // ESC/POS thermal printer service UUIDs
+    const PRINTER_SERVICE_UUIDS = [
+        '000018f0-0000-1000-8000-00805f9b34fb',
+        '00001101-0000-1000-8000-00805f9b34fb',
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+    ];
+    const PRINTER_CHAR_UUIDS = [
+        '00002af1-0000-1000-8000-00805f9b34fb',
+        '000018f0-0000-1000-8000-00805f9b34fb',
+        '49535343-8841-43f4-a8d4-ecbe34729bb3',
+    ];
+
+    function isMobile() {
+        return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    }
+
+    async function connectPrinter() {
+        // If already connected, disconnect
+        if (printerOnline) {
+            if (printerMode === 'bluetooth' && printerDevice && printerDevice.gatt.connected) {
+                printerDevice.gatt.disconnect();
+            }
+            printerOnline = false;
+            printerMode = null;
+            updatePrinterUI(false);
+            Swal.fire('Disconnected', 'Printer disconnected.', 'info');
+            return;
+        }
+
+        // Try Web Bluetooth first (works on mobile/Android Chrome)
+        if (navigator.bluetooth) {
+            try {
+                await connectBluetooth();
+                return;
+            } catch (err) {
+                console.log('Web Bluetooth failed:', err.message);
+            }
+        }
+
+        // Fall back to print server (desktop Linux)
+        try {
+            await connectPrintServer();
+        } catch (err) {
+            Swal.fire({
+                title: 'Connection Failed',
+                html: 'Could not connect via Bluetooth or print server.<br><br>' +
+                      '<b>Mobile:</b> Make sure Bluetooth is on and printer is in range.<br>' +
+                      '<b>Desktop:</b> Start print server: <code>python3 print_server.py</code>',
+                icon: 'error'
+            });
+        }
+    }
+
+    async function connectBluetooth() {
+        Swal.fire({
+            title: 'Connecting...',
+            text: 'Select your Bluetooth thermal printer',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+
+        printerDevice = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: PRINTER_SERVICE_UUIDS,
+        });
+
+        const server = await printerDevice.gatt.connect();
+
+        // Try known services
+        for (const svcUuid of PRINTER_SERVICE_UUIDS) {
+            try {
+                const service = await server.getPrimaryService(svcUuid);
+                for (const charUuid of PRINTER_CHAR_UUIDS) {
+                    try {
+                        printerCharacteristic = await service.getCharacteristic(charUuid);
+                        break;
+                    } catch(e) {}
+                }
+                if (printerCharacteristic) break;
+            } catch(e) {}
+        }
+
+        // Fallback: discover any writable characteristic
+        if (!printerCharacteristic) {
+            const services = await server.getPrimaryServices();
+            for (const svc of services) {
+                const chars = await svc.getCharacteristics();
+                for (const ch of chars) {
+                    if (ch.properties.write || ch.properties.writeWithoutResponse) {
+                        printerCharacteristic = ch;
+                        break;
+                    }
+                }
+                if (printerCharacteristic) break;
+            }
+        }
+
+        if (!printerCharacteristic) {
+            throw new Error('No writable characteristic found');
+        }
+
+        printerDevice.addEventListener('gattserverdisconnected', async () => {
+            if (printerReconnecting) return;
+            printerReconnecting = true;
+            printerOnline = false;
+            updatePrinterUI(false);
+            // Try silent reconnect (may fail without user gesture)
+            try {
+                console.log('Printer disconnected, attempting auto-reconnect...');
+                await printerDevice.gatt.connect();
+                printerOnline = true;
+                updatePrinterUI(true);
+                console.log('Printer reconnected automatically');
+            } catch (err) {
+                console.log('Auto-reconnect failed, will prompt on next print:', err.message);
+            }
+            printerReconnecting = false;
+        });
+
+        printerOnline = true;
+        printerMode = 'bluetooth';
+        updatePrinterUI(true);
+        Swal.fire('Connected!', 'Bluetooth printer connected.', 'success');
+    }
+
+    async function connectPrintServer() {
+        Swal.fire({
+            title: 'Checking printer...',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+
+        const res = await fetch(`${PRINT_SERVER_URL}/status`);
+        const data = await res.json();
+
+        if (data.success && data.printer_found) {
+            printerOnline = true;
+            printerMode = 'server';
+            updatePrinterUI(true);
+            Swal.fire('Connected!', `Printer ${data.printer_mac} is ready.`, 'success');
+        } else {
+            printerOnline = false;
+            updatePrinterUI(false);
+            Swal.fire('Printer Not Found', 'Make sure the printer is turned on and in range.', 'warning');
+        }
+    }
+
+    function updatePrinterUI(connected) {
+        const btn = document.getElementById('printerBtn');
+        const label = document.getElementById('printerLabel');
+        if (connected) {
+            btn.classList.add('connected');
+            label.textContent = 'Printer Connected';
+        } else {
+            btn.classList.remove('connected');
+            label.textContent = 'Connect Printer';
+        }
+    }
+
+    // Print barcode - routes to Bluetooth or print server
+    async function printBarcode(barcode, weight, price, product_name = '') {
+        // Check if printer needs (re)connecting
+        if (!printerOnline || (printerMode === 'bluetooth' && printerDevice && !printerDevice.gatt.connected)) {
+            const r = await Swal.fire({
+                title: 'Printer Not Connected',
+                text: 'Connect to your Bluetooth printer to print?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Connect',
+                cancelButtonText: 'Cancel'
+            });
+            if (r.isConfirmed) {
+                await connectPrinter();
+                if (!printerOnline) return;
+            } else {
+                return;
+            }
+        }
+
+        if (printerMode === 'bluetooth') {
+            await printViaBluetooth(barcode, weight, price, product_name);
+        } else {
+            await printViaServer(barcode, weight, price, product_name);
+        }
+    }
+
+    async function printViaBluetooth(barcode, weight, price, product_name = '') {
+        try {
+            Swal.fire({ title: 'Printing...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const enc = new TextEncoder();
+            const weightStr = parseFloat(weight).toString();
+            const cmds = [
+                [0x1B, 0x40],
+                [0x1B, 0x61, 0x01],
+                [0x1B, 0x21, 0x10],
+                ...enc.encode('Arusha Mchele Loft\n'),
+                [0x1B, 0x21, 0x01],
+                ...enc.encode((product_name || 'Rice') + '\n'),
+                [0x1B, 0x21, 0x00],
+                ...enc.encode(weightStr + 'kg\n'),
+                [0x0A],
+                [0x1D, 0x6B, 0x49, barcode.length, ...enc.encode(barcode)],
+                [0x0A, 0x0A],
+                [0x1D, 0x56, 0x42, 0x00],
+            ];
+            const data = new Uint8Array(cmds.flat());
+            const CHUNK = 180;
+            for (let i = 0; i < data.length; i += CHUNK) {
+                const chunk = data.slice(i, i + CHUNK);
+                if (printerCharacteristic.properties.writeWithoutResponse) {
+                    await printerCharacteristic.writeValueWithoutResponse(chunk);
+                } else {
+                    await printerCharacteristic.writeValueWithResponse(chunk);
+                }
+            }
+            Swal.fire('Printed!', 'Barcode label printed: ' + barcode, 'success');
+        } catch (err) {
+            Swal.fire('Print Failed', err.message || 'Could not print via Bluetooth.', 'error');
+        }
+    }
+
+    async function printViaServer(barcode, weight, price, product_name = '') {
+        try {
+            Swal.fire({ title: 'Printing...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const res = await fetch(`${PRINT_SERVER_URL}/print`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ barcode, product_name, weight, price, company_name: 'Arusha Mchele Loft', price_formatted: Number(price).toLocaleString() })
+            });
+            const data = await res.json();
+            if (data.success) {
+                Swal.fire('Printed!', data.message, 'success');
+            } else {
+                Swal.fire('Print Failed', data.message, 'error');
+            }
+        } catch (err) {
+            Swal.fire('Print Failed', 'Could not reach print server.', 'error');
+        }
+    }
+
+    // ---- Modal & CRUD ----
+    function filterStock() {
+        const query = document.getElementById('stockSearch').value.toLowerCase();
+        const table = document.getElementById('stockTable');
+        const rows = table.querySelectorAll('tbody tr');
+        let visibleCount = 0;
+        rows.forEach(row => {
+            if (row.id === 'noResults') return;
+            const text = row.textContent.toLowerCase();
+            if (text.includes(query)) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        document.getElementById('noResults').style.display = visibleCount === 0 ? '' : 'none';
+    }
+
+    function applyStoreFilter() {
+        const storeId = document.getElementById('storeFilter').value;
+        const url = '{% url "inventory_list" %}' + (storeId ? '?store_id=' + storeId : '');
+        window.location.href = url;
+    }
+
+    function openModal() {
+        document.getElementById('modalTitle').textContent = 'Create New Package';
+        document.getElementById('packageForm').reset();
+        document.getElementById('packageId').value = '';
+        document.getElementById('printAfterSave').checked = true;
+        {% if not is_manager and user.store %}
+        document.getElementById('storeSelect').value = '{{ user.store.id }}';
+        {% endif %}
+        document.getElementById('packageModal').classList.add('show');
+    }
+
+    function closeModal() {
+        document.getElementById('packageModal').classList.remove('show');
+    }
+
+    document.getElementById('packageModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+
+    // Submit form via AJAX so we get barcode back and can print
+    document.getElementById('packageForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const csrfToken = formData.get('csrfmiddlewaretoken');
+        const isEdit = formData.get('package_id');
+        const shouldPrint = document.getElementById('printAfterSave').checked && !isEdit;
+
+        // Show centered loading overlay
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.id = 'saveLoadingOverlay';
+        loadingOverlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:99999;';
+        loadingOverlay.innerHTML = '<div style="background:#fff; padding:30px 40px; border-radius:12px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.2);"><i class="fa fa-spinner fa-spin" style="font-size:32px; color:#f59e0b; margin-bottom:12px; display:block;"></i><div style="font-size:15px; font-weight:600; color:#374151;">Saving & Printing...</div></div>';
+        document.body.appendChild(loadingOverlay);
+
+        try {
+            const res = await fetch('{% url "create_package" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken },
+            });
+            const data = await res.json();
+            if (data.success) {
+                closeModal();
+                if (shouldPrint && data.barcode) {
+                    loadingOverlay.remove();
+                    await printBarcode(data.barcode, data.weight, data.selling_price, data.product_name || '');
+                } else {
+                    loadingOverlay.remove();
+                }
+                Swal.fire({
+                    icon: 'success',
+                    title: data.message,
+                    showConfirmButton: false,
+                    timer: 2000
+                }).then(() => location.reload());
+            } else {
+                loadingOverlay.remove();
+                Swal.fire('Error', data.message || 'Failed to save package.', 'error');
+            }
+        } catch (err) {
+            loadingOverlay.remove();
+            Swal.fire('Error', 'Network error: ' + err.message, 'error');
+        }
+    });
+
+    function editPackage(id) {
+        fetch(`/get_package/${id}/`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('modalTitle').textContent = 'Edit Package';
+                document.getElementById('packageId').value = data.id;
+                document.getElementById('product_name').value = data.product_name;
+                document.getElementById('weight').value = data.weight;
+                document.getElementById('selling_price').value = data.selling_price;
+                document.getElementById('batch_number').value = data.batch_number;
+                document.getElementById('production_date').value = data.production_date || '';
+                document.getElementById('status').value = data.status;
+                document.getElementById('notes').value = data.notes;
+                document.getElementById('storeSelect').value = data.store_id || '';
+                document.getElementById('printAfterSave').checked = false;
+                document.getElementById('packageModal').classList.add('show');
+            })
+            .catch(() => {
+                Swal.fire('Error', 'Failed to load package data', 'error');
+            });
+    }
+
+    function deletePackage(id, barcode) {
+        Swal.fire({
+            title: 'Delete Package?',
+            text: `Are you sure you want to delete "${barcode}"?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, delete',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch(`/delete_package/${id}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire('Deleted!', data.message, 'success')
+                            .then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                })
+                .catch(() => {
+                    Swal.fire('Error', 'Failed to delete package', 'error');
+                });
+            }
+        });
+    }
+
+    {% if messages %}
+        {% for message in messages %}
+            Swal.fire({
+                icon: '{{ message.tags|default:"info" }}',
+                title: '{{ message }}',
+                showConfirmButton: false,
+                timer: 2500
+            });
+        {% endfor %}
+    {% endif %}
+</script>
+{% endblock %}

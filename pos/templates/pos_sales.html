@@ -1,0 +1,231 @@
+{% extends 'pos_base.html' %}
+{% load humanize %}
+
+{% block page_title %}Sales{% endblock %}
+
+{% block sidebar_nav %}
+<a href="{% url 'pos_dashboard' %}"><i class="fa fa-cash-register"></i> POS Dashboard</a>
+<a class="active" href="{% url 'sales_list' %}"><i class="fa fa-receipt"></i> Sales</a>
+<a href="{% url 'pos_stock_lookup' %}"><i class="fa fa-boxes-stacked"></i> Stock Lookup</a>
+<a href="{% url 'expenditure_list' %}"><i class="fa fa-money-bill-wave"></i> Expenditures</a>
+<a href="{% url 'funga_hesabu' %}"><i class="fa fa-lock"></i> Funga Hesabu</a>
+{% endblock %}
+
+{% block content %}
+    <!-- Two Stat Cards (centered) -->
+    <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 16px; flex-wrap: wrap;">
+        <div class="card p1" style="min-width: 200px; max-width: 260px; flex: 0 1 260px;">
+            <h3>Total Sales</h3>
+            <h1>{{ total_sales }}</h1>
+        </div>
+        <div class="card p2" style="min-width: 200px; max-width: 260px; flex: 0 1 260px;">
+            <h3>Total Revenue</h3>
+            <h1>TSh {{ total_revenue|intcomma }}</h1>
+        </div>
+    </div>
+
+    <!-- Search + Date Filters (compact, centered) -->
+    <form method="GET" action="{% url 'sales_list' %}" id="salesFilterForm" style="display: flex; gap: 8px; align-items: center; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;">
+        <div style="position:relative;">
+            <i class="fa fa-search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#9ca3af; font-size:13px;"></i>
+            <input type="text" name="search" id="salesSearchInput" value="{{ search }}" placeholder="Receipt, barcode, product..." style="padding:6px 10px 6px 30px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; min-width:200px;">
+        </div>
+        <input type="date" name="start_date" id="startDate" value="{{ start_date }}" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
+        <span style="color:#9ca3af; font-size:13px;">to</span>
+        <input type="date" name="end_date" id="endDate" value="{{ end_date }}" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
+        <button type="submit" style="padding:6px 16px; background:#f59e0b; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;"><i class="fa fa-search"></i> Search</button>
+        {% if search or start_date or end_date %}
+        <a href="{% url 'sales_list' %}" style="padding:6px 12px; background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"><i class="fa fa-times"></i> Clear</a>
+        {% endif %}
+    </form>
+
+    <!-- All Sales Table -->
+    <div class="grid" style="grid-template-columns: 1fr;" id="recentSalesSection">
+        <div class="panel">
+            <div class="section-header">
+                <h2>All Sales</h2>
+            </div>
+            <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <table id="salesTable" style="min-width: 750px; border-collapse: collapse; width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: center; background: #f9fafb; font-weight: 700;">S/N</th>
+                        <th style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: left; background: #f9fafb; font-weight: 700;">Receipt #</th>
+                        <th style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: left; background: #f9fafb; font-weight: 700;">Product</th>
+                        <th style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: left; background: #f9fafb; font-weight: 700;">Barcode</th>
+                        <th style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: left; background: #f9fafb; font-weight: 700;">Weight</th>
+                        <th style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: left; background: #f9fafb; font-weight: 700;">Price</th>
+                        <th style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: left; background: #f9fafb; font-weight: 700;">Total</th>
+                        <th style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: left; background: #f9fafb; font-weight: 700;">Payment</th>
+                        <th style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: left; background: #f9fafb; font-weight: 700;">Date</th>
+                        <th style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: center; background: #f9fafb; font-weight: 700;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in sales %}
+                        {% for item in sale.items.all %}
+                        <tr>
+                            {% if forloop.first %}
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: center; vertical-align: top;" rowspan="{{ sale.items.count }}">{{ forloop.parentloop.counter }}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; vertical-align: top;" rowspan="{{ sale.items.count }}">
+                                <strong>{{ sale.receipt_number }}</strong>
+                                {% if sale.items.count > 1 %}<br><span style="font-size:11px; color:#6b7280;">{{ sale.items.count }} items</span>{% endif %}
+                            </td>
+                            {% endif %}
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px;">{{ item.product_name|default:"-" }}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; font-size: 12px; color: #6b7280;">{{ item.barcode_value }}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px;">{{ item.weight }} kg</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; font-weight: 600;">TSh {{ item.selling_price|intcomma }}</td>
+                            {% if forloop.first %}
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; font-weight: 700; color: #059669; vertical-align: top;" rowspan="{{ sale.items.count }}">TSh {{ sale.total_amount|intcomma }}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; vertical-align: top;" rowspan="{{ sale.items.count }}">{{ sale.get_payment_method_display }}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; white-space: nowrap; vertical-align: top;" rowspan="{{ sale.items.count }}">{{ sale.sale_date|date:"d M Y, H:i" }}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: center; vertical-align: top;" rowspan="{{ sale.items.count }}">
+                                <button class="btn-action" onclick="viewReceipt({{ sale.id }})" title="View receipt"><i class="fa fa-receipt"></i></button>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                        {% if sale.items.count == 0 %}
+                        <tr>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: center;">{{ forloop.counter }}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px;"><strong>{{ sale.receipt_number }}</strong></td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; color: #9ca3af;" colspan="4">No items (legacy sale)</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; font-weight: 700; color: #059669;">TSh {{ sale.total_amount|intcomma }}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px;">{{ sale.get_payment_method_display }}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; white-space: nowrap;">{{ sale.sale_date|date:"d M Y, H:i" }}</td>
+                            <td style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: center;">
+                                <button class="btn-action" onclick="viewReceipt({{ sale.id }})" title="View receipt"><i class="fa fa-receipt"></i></button>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" style="border: 1px solid #d1d5db; padding: 10px 12px; text-align: center; color: #9ca3af; padding: 30px;">No sales yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <div style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:16px; flex-wrap:wrap;">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}&search={{ search }}&start_date={{ start_date }}&end_date={{ end_date }}" style="padding:6px 12px; background:#f3f4f6; border:1px solid #d1d5db; border-radius:6px; text-decoration:none; color:#374151; font-size:13px; font-weight:600;"><i class="fa fa-chevron-left"></i> Prev</a>
+                {% endif %}
+                <span style="padding:6px 14px; background:#f59e0b; color:#fff; border-radius:6px; font-size:13px; font-weight:700;">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}&search={{ search }}&start_date={{ start_date }}&end_date={{ end_date }}" style="padding:6px 12px; background:#f3f4f6; border:1px solid #d1d5db; border-radius:6px; text-decoration:none; color:#374151; font-size:13px; font-weight:600;">Next <i class="fa fa-chevron-right"></i></a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div class="modal-overlay" id="receiptModal">
+        <div class="modal" style="max-width: 380px;">
+            <h2>Receipt</h2>
+            <div id="receiptContent" style="font-family: monospace; font-size: 13px; line-height: 1.6; background:#fff; border:1px dashed #d1d5db; border-radius:8px; padding:16px; margin-bottom:16px;">
+            </div>
+            <div class="modal-actions" style="justify-content: center;">
+                <button type="button" class="btn-secondary" onclick="closeReceiptModal()">Close</button>
+                <button type="button" class="btn-primary" onclick="printReceiptContent()"><i class="fa fa-print"></i> Print</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Auto-search with debounce
+    let salesSearchTimer;
+    document.getElementById('salesSearchInput').addEventListener('input', function() {
+        clearTimeout(salesSearchTimer);
+        salesSearchTimer = setTimeout(() => {
+            document.getElementById('salesFilterForm').submit();
+        }, 800);
+    });
+
+    // Auto-submit on date change
+    document.getElementById('startDate').addEventListener('change', function() {
+        document.getElementById('salesFilterForm').submit();
+    });
+    document.getElementById('endDate').addEventListener('change', function() {
+        document.getElementById('salesFilterForm').submit();
+    });
+
+    function getCSRFToken() {
+        const cookie = document.cookie.match(/csrftoken=([^;]+)/);
+        return cookie ? cookie[1] : '';
+    }
+
+    function closeReceiptModal() {
+        document.getElementById('receiptModal').classList.remove('show');
+    }
+
+    async function viewReceipt(saleId) {
+        try {
+            const res = await fetch(`{% url 'get_sale' 0 %}`.replace('0', saleId));
+            const data = await res.json();
+            showReceipt(data);
+        } catch (err) {
+            Swal.fire('Error', 'Could not load receipt', 'error');
+        }
+    }
+
+    function showReceipt(data) {
+        let itemsHtml = '';
+        data.items.forEach(item => {
+            itemsHtml += `
+                <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;">
+                    <div>
+                        <div>${item.product_name || '-'}</div>
+                        <div style="color:#6b7280; font-size:11px;">${item.barcode} · ${item.weight} kg</div>
+                    </div>
+                    <div style="font-weight:700;">${item.price_formatted}</div>
+                </div>
+            `;
+        });
+        const html = `
+            <div style="text-align:center; border-bottom:1px dashed #d1d5db; padding-bottom:10px; margin-bottom:10px;">
+                <strong style="font-size:16px;">Arusha Mchele Loft</strong><br>
+                <span style="font-size:11px; color:#6b7280;">Sales & Inventory System</span><br>
+                <span style="font-size:11px; color:#6b7280;">Tel: +255 700 000 000</span>
+            </div>
+            <div style="margin-bottom:10px;">
+                <strong>Receipt #:</strong> ${data.receipt_number}<br>
+                <strong>Date:</strong> ${data.sale_date}<br>
+                <strong>Served by:</strong> ${data.sold_by}
+            </div>
+            <div style="border-top:1px dashed #d1d5db; border-bottom:1px dashed #d1d5db; padding:8px 0; margin-bottom:10px;">
+                ${itemsHtml}
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:14px; font-weight:700;">
+                <span>Total:</span>
+                <span>${data.total_amount}</span>
+            </div>
+            <div style="margin-bottom:10px;">
+                <strong>Payment:</strong> ${data.payment_method}
+            </div>
+            <div style="text-align:center; border-top:1px dashed #d1d5db; padding-top:10px; font-size:11px; color:#6b7280;">
+                Thank you for your business!<br>
+                Goods sold are not returnable.
+            </div>
+        `;
+        document.getElementById('receiptContent').innerHTML = html;
+        document.getElementById('receiptModal').classList.add('show');
+    }
+
+    function printReceiptContent() {
+        const content = document.getElementById('receiptContent').innerHTML;
+        const w = window.open('', '', 'width=380,height=600');
+        w.document.write(`<html><head><title>Receipt</title><style>body{font-family:monospace;font-size:13px;padding:16px;}</style></head><body>${content}</body></html>`);
+        w.document.close();
+        w.focus();
+        w.print();
+        w.close();
+    }
+</script>
+{% endblock %}

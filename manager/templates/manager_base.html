@@ -1,0 +1,864 @@
+{% load static %}
+{% load pwa %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Manager{% endblock %} - Arusha Mchele Loft</title>
+    {% progressive_web_app_meta %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        html, body {
+            overflow-x: hidden;
+            max-width: 100%;
+        }
+
+        body {
+            background: #f4f6fb;
+        }
+
+        .wrapper {
+            display: flex;
+            min-height: 100vh;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: #111827;
+            color: #fff;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-self: stretch;
+            min-height: 100vh;
+        }
+
+        .sidebar-header {
+            padding: 18px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-header::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .brand-logo i {
+            font-size: 20px;
+            color: #fff;
+        }
+
+        .brand-text h2 {
+            font-size: 15px;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1.3;
+            letter-spacing: 0.3px;
+        }
+
+        .brand-text h2 span {
+            font-size: 10px;
+            color: #f59e0b;
+            display: block;
+            margin-top: 3px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .sidebar-nav {
+            padding: 15px 12px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #9ca3af;
+            text-decoration: none;
+            padding: 11px 14px;
+            border-radius: 10px;
+            margin: 4px 0;
+            white-space: nowrap;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-nav a i {
+            width: 20px;
+            text-align: center;
+            font-size: 15px;
+        }
+
+        .sidebar-nav a:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: #fff;
+        }
+
+        .sidebar-nav a.active {
+            background: #f59e0b;
+            color: #fff;
+        }
+
+        /* Main */
+        .main {
+            flex: 1;
+            min-width: 0;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #fff;
+            padding: 14px 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .top h1 {
+            font-size: 22px;
+            color: #1f2937;
+        }
+
+        .top-center {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .top-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .top-right .username {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .user-dropdown {
+            position: relative;
+        }
+
+        .user-dropdown .user-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            color: #6b7280;
+            transition: all 0.2s ease;
+        }
+
+        .user-dropdown .user-icon:hover {
+            background: #e5e7eb;
+            color: #1f2937;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 45px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            min-width: 160px;
+            overflow: hidden;
+            z-index: 100;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+        }
+
+        .dropdown-menu a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            color: #374151;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-menu a:hover {
+            background: #f3f4f6;
+        }
+
+        .dropdown-menu a.logout {
+            color: #dc2626;
+        }
+
+        /* Cards */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .card {
+            padding: 20px;
+            border-radius: 16px;
+            color: #fff;
+        }
+
+        .p1 { background: #8b5cf6; }
+        .p2 { background: #3b82f6; }
+        .p3 { background: #f97316; }
+        .p4 { background: #22c55e; }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .panel {
+            background: #fff;
+            border-radius: 16px;
+            padding: 20px;
+            overflow: hidden;
+            box-shadow: 0 5px 18px rgba(0, 0, 0, .08);
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* Tables grid */
+        .tables {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .t {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* Progress circle */
+        .progress {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: conic-gradient(#f59e0b 40%, #eee 0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: auto;
+        }
+
+        .progress div {
+            width: 130px;
+            height: 130px;
+            background: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            font-weight: bold;
+        }
+
+        /* Menu grid */
+        .menu {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .item {
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 5px 18px rgba(0, 0, 0, .08);
+        }
+
+        .item img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+        }
+
+        .item h4 {
+            padding: 12px;
+        }
+
+        /* Staff table */
+        .staff-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .staff-table th {
+            text-align: left;
+            padding: 12px 14px;
+            background: #f9fafb;
+            color: #374151;
+            font-size: 13px;
+            font-weight: 600;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .staff-table td {
+            padding: 12px 14px;
+            font-size: 14px;
+            color: #374151;
+        }
+
+        .staff-table tr:hover {
+            background: #f9fafb;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .role-manager { background: #ede9fe; color: #7c3aed; }
+        .role-sales_person { background: #dbeafe; color: #2563eb; }
+        .role-stock_person { background: #ffedd5; color: #ea580c; }
+
+        .status-active { color: #16a34a; font-weight: 600; }
+        .status-inactive { color: #dc2626; font-weight: 600; }
+
+        .btn-add {
+            background: #f59e0b;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-add:hover {
+            background: #d97706;
+        }
+
+        .btn-action {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-action.edit { color: #2563eb; }
+        .btn-action.edit:hover { background: #dbeafe; }
+        .btn-action.delete { color: #dc2626; }
+        .btn-action.delete:hover { background: #fee2e2; }
+        .btn-action.print { color: #0891b2; }
+        .btn-action.print:hover { background: #cffafe; }
+
+        .btn-printer {
+            background: #1f2937;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+        .btn-printer:hover { background: #374151; }
+        .btn-printer.connected {
+            background: #16a34a;
+        }
+        .btn-printer.connected:hover { background: #15803d; }
+
+        .section-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            width: 420px;
+            max-width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal h2 {
+            font-size: 20px;
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+
+        .modal .form-group {
+            margin-bottom: 16px;
+        }
+
+        .modal label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+
+        .modal input,
+        .modal select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #1f2937;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .modal input:focus,
+        .modal select:focus {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn-primary {
+            flex: 1;
+            padding: 11px;
+            background: #f59e0b;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            background: #d97706;
+        }
+
+        .btn-secondary {
+            flex: 1;
+            padding: 11px;
+            background: #f3f4f6;
+            color: #374151;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-header h2 {
+            font-size: 20px;
+            color: #1f2937;
+        }
+
+        /* Mobile hamburger button */
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 22px;
+            color: #1f2937;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+
+        /* Floating Action Button */
+        .fab {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #f59e0b;
+            color: #fff;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+            z-index: 997;
+            transition: transform 0.2s ease;
+        }
+
+        .fab:active {
+            transform: scale(0.9);
+        }
+
+        /* Payment buttons */
+        .pay-btn {
+            flex: 1;
+            padding: 12px 8px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            background: #fff;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pay-btn i {
+            font-size: 18px;
+        }
+
+        .pay-btn.active {
+            border-color: #f59e0b;
+            background: #fffbeb;
+            color: #f59e0b;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+        }
+
+        /* Responsive */
+        @media (max-width: 1000px) {
+            .cards, .menu, .tables, .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -280px;
+                top: 0;
+                width: 260px;
+                z-index: 999;
+                transition: left 0.3s ease;
+            }
+            .sidebar.open {
+                left: 0;
+            }
+            .sidebar.open + .sidebar-overlay {
+                display: block;
+            }
+            .menu-toggle {
+                display: block;
+            }
+            .fab {
+                display: none;
+            }
+            #posStats {
+                display: none;
+            }
+            #mobileScanHome {
+                display: flex !important;
+            }
+            .top {
+                padding: 12px 14px;
+            }
+            .top h1 {
+                font-size: 18px;
+            }
+            .top-center {
+                display: none;
+            }
+            .main {
+                padding: 14px;
+            }
+            .staff-table {
+                font-size: 13px;
+            }
+            .staff-table th, .staff-table td {
+                padding: 8px 6px;
+                white-space: nowrap;
+            }
+            .section-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            .section-header h2 {
+                font-size: 18px;
+            }
+            .section-actions {
+                flex-direction: column;
+                gap: 8px;
+                width: 100%;
+            }
+            .section-actions .search-bar,
+            .section-actions input#stockSearch {
+                width: 100% !important;
+                box-sizing: border-box;
+            }
+            .section-actions .btn-printer,
+            .section-actions .btn-add {
+                width: 100%;
+                justify-content: center;
+                padding: 16px 24px;
+                font-size: 18px;
+            }
+            .cards {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 10px;
+            }
+            .card {
+                padding: 14px;
+            }
+            .card h1 {
+                font-size: 24px;
+            }
+            .card h3 {
+                font-size: 12px;
+            }
+            .grid {
+                grid-template-columns: 1fr !important;
+            }
+            .panel {
+                padding: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .cards {
+                grid-template-columns: 1fr !important;
+            }
+            .staff-table {
+                font-size: 12px;
+            }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="wrapper">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-logo">
+                        <i class="fa fa-wheat-awn"></i>
+                    </div>
+                    <div class="brand-text">
+                        <h2>Arusha Mchele Loft<span>Sales &amp; Inventory System</span></h2>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-nav">
+                {% block sidebar_nav %}
+                <a href="{% url 'dashboard' %}" class="{% block nav_dashboard %}{% endblock %}"><i class="fa fa-gauge-high"></i> Manager Dashboard</a>
+                <a href="{% url 'manager_sales' %}" class="{% block nav_sales %}{% endblock %}"><i class="fa fa-receipt"></i> Sales</a>
+                <a href="{% url 'manager_stock' %}" class="{% block nav_stock %}{% endblock %}"><i class="fa fa-boxes-stacked"></i> Stock</a>
+                <a href="{% url 'stores' %}" class="{% block nav_stores %}{% endblock %}"><i class="fa fa-store"></i> Stores</a>
+                <a href="{% url 'staff' %}" class="{% block nav_staff %}{% endblock %}"><i class="fa fa-user-tie"></i> Staff</a>
+                <a href="{% url 'expenditure_list' %}" class="{% block nav_expenditure %}{% endblock %}"><i class="fa fa-money-bill-wave"></i> Expenditures</a>
+                <a href="{% url 'funga_hesabu' %}" class="{% block nav_funga %}{% endblock %}"><i class="fa fa-lock"></i> Funga Hesabu</a>
+                <a><i class="fa fa-chart-line"></i> Reports</a>
+                {% endblock %}
+            </div>
+        </div>
+
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+        <!-- Main Content -->
+        <div class="main">
+            <!-- Top Bar -->
+            <div class="top">
+                <button class="menu-toggle" onclick="toggleSidebar()"><i class="fa fa-bars"></i></button>
+                <h1>{% block page_title %}Manager Dashboard{% endblock %}</h1>
+                <div class="top-center" id="clock"></div>
+                <div class="top-right">
+                    <span class="username">{{ request.user.username }}</span>
+                    <div class="user-dropdown">
+                        <div class="user-icon" onclick="toggleDropdown()">
+                            <i class="fa fa-user"></i>
+                        </div>
+                        <div class="dropdown-menu" id="dropdownMenu">
+                            <a><i class="fa fa-gear"></i> Settings</a>
+                            <a class="logout" href="{% url 'logout' %}"><i class="fa fa-right-from-bracket"></i> Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    <script>
+        function toggleDropdown() {
+            document.getElementById('dropdownMenu').classList.toggle('show');
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.user-dropdown')) {
+                document.getElementById('dropdownMenu').classList.remove('show');
+            }
+        });
+
+        function updateClock() {
+            const now = new Date();
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const day = days[now.getDay()];
+            const date = now.getDate();
+            const month = months[now.getMonth()];
+            const year = now.getFullYear();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('clock').textContent = day + ' ' + date + ' ' + month + ' ' + year + '  |  ' + h + ':' + m + ':' + s;
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        // Lock orientation to portrait
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('portrait').catch(() => {});
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('portrait').catch(() => {});
+            }
+        });
+        // Re-lock on orientation change attempts
+        screen.orientation && screen.orientation.addEventListener('change', () => {
+            if (screen.orientation.type.startsWith('landscape')) {
+                if (screen.orientation.lock) {
+                    screen.orientation.lock('portrait').catch(() => {});
+                }
+            }
+        });
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

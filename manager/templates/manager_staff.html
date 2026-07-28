@@ -1,0 +1,211 @@
+{% extends 'manager_base.html' %}
+
+{% block title %}Staff{% endblock %}
+{% block nav_staff %}active{% endblock %}
+{% block page_title %}Staff Management{% endblock %}
+
+{% block content %}
+    <div class="panel">
+        <div class="section-header">
+            <h2>Staff List</h2>
+            <button class="btn-add" onclick="openModal()">
+                <i class="fa fa-plus"></i> Add User
+            </button>
+        </div>
+
+        <table class="staff-table">
+            <thead>
+                <tr>
+                    <th>S/n</th>
+                    <th>Username</th>
+                    <th>Full Name</th>
+                    <th>Role</th>
+                    <th>Store</th>
+                    <th>Phone</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.first_name }} {{ user.last_name }}</td>
+                    <td>
+                        <span class="role-badge role-{{ user.role }}">{{ user.get_role_display }}</span>
+                    </td>
+                    <td>{{ user.store.name|default:"<span style='color:#9ca3af;'>-</span>"|safe }}</td>
+                    <td>{{ user.phone|default:"-" }}</td>
+                    <td>
+                        {% if user.is_active %}
+                            <span class="status-active">Active</span>
+                        {% else %}
+                            <span class="status-inactive">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn-action edit" onclick="editUser({{ user.id }})"><i class="fa fa-pen"></i></button>
+                        <button class="btn-action delete" onclick="deleteUser({{ user.id }}, '{{ user.username }}')"><i class="fa fa-trash"></i></button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Create User Modal -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal">
+            <h2 id="modalTitle">Create New User</h2>
+            <form id="userForm" method="post" action="{% url 'create_user' %}">
+                {% csrf_token %}
+                <input type="hidden" name="user_id" id="userId">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" name="username" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input type="text" name="first_name" id="first_name">
+                </div>
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" name="last_name" id="last_name">
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="text" name="phone" id="phone">
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select name="role" id="role" required onchange="toggleStoreField()">
+                        <option value="manager">Manager</option>
+                        <option value="sales_person" selected>Sales Person</option>
+                        <option value="stock_person">Stock Person</option>
+                    </select>
+                </div>
+                <div class="form-group" id="storeGroup">
+                    <label>Store</label>
+                    <select name="store_id" id="storeSelect">
+                        <option value="">-- Select Store --</option>
+                        {% for s in stores %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" id="passwordGroup">
+                    <label>Password</label>
+                    <input type="password" name="password" id="password">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function toggleStoreField() {
+        const role = document.getElementById('role').value;
+        const storeGroup = document.getElementById('storeGroup');
+        if (role === 'manager') {
+            storeGroup.style.display = 'none';
+            document.getElementById('storeSelect').value = '';
+        } else {
+            storeGroup.style.display = 'block';
+        }
+    }
+
+    function openModal() {
+        document.getElementById('modalTitle').textContent = 'Create New User';
+        document.getElementById('userForm').reset();
+        document.getElementById('userId').value = '';
+        document.getElementById('passwordGroup').style.display = 'block';
+        document.getElementById('password').required = true;
+        document.getElementById('role').value = 'sales_person';
+        toggleStoreField();
+        document.getElementById('userModal').classList.add('show');
+    }
+
+    function closeModal() {
+        document.getElementById('userModal').classList.remove('show');
+    }
+
+    document.getElementById('userModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+
+    function editUser(id) {
+        fetch(`/get_user/${id}/`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('modalTitle').textContent = 'Edit User';
+                document.getElementById('userId').value = data.id;
+                document.getElementById('username').value = data.username;
+                document.getElementById('first_name').value = data.first_name;
+                document.getElementById('last_name').value = data.last_name;
+                document.getElementById('phone').value = data.phone;
+                document.getElementById('role').value = data.role;
+                document.getElementById('storeSelect').value = data.store_id || '';
+                toggleStoreField();
+                document.getElementById('passwordGroup').style.display = 'none';
+                document.getElementById('password').required = false;
+                document.getElementById('userModal').classList.add('show');
+            })
+            .catch(() => {
+                Swal.fire('Error', 'Failed to load user data', 'error');
+            });
+    }
+
+    function deleteUser(id, username) {
+        Swal.fire({
+            title: 'Delete User?',
+            text: `Are you sure you want to delete "${username}"?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, delete',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch(`/delete_user/${id}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire('Deleted!', data.message, 'success')
+                            .then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                })
+                .catch(() => {
+                    Swal.fire('Error', 'Failed to delete user', 'error');
+                });
+            }
+        });
+    }
+
+    {% if messages %}
+        {% for message in messages %}
+            Swal.fire({
+                icon: '{{ message.tags|default:"info" }}',
+                title: '{{ message }}',
+                showConfirmButton: false,
+                timer: 2500
+            });
+        {% endfor %}
+    {% endif %}
+</script>
+{% endblock %}

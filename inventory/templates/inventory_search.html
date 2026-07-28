@@ -1,0 +1,87 @@
+{% extends 'inventory_base.html' %}
+{% load humanize %}
+
+{% block title %}Stock Search{% endblock %}
+{% block page_title %}Stock Search{% endblock %}
+
+{% block sidebar_nav %}
+<a href="{% url 'inventory_dashboard' %}"><i class="fa fa-boxes-stacked"></i> Inventory Dashboard</a>
+<a href="{% url 'inventory_list' %}"><i class="fa fa-box"></i> Stock</a>
+<a class="active" href="{% url 'stock_search' %}"><i class="fa fa-magnifying-glass"></i> Stock Search</a>
+{% endblock %}
+
+{% block content %}
+    <div class="panel">
+        <div class="section-header">
+            <h2>Stock Search</h2>
+        </div>
+
+        <form method="GET" action="{% url 'stock_search' %}" style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; align-items:center;">
+            <div style="position:relative; flex:1; min-width:250px;">
+                <i class="fa fa-search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#9ca3af; font-size:12px;"></i>
+                <input type="text" name="q" value="{{ query }}" placeholder="Search by barcode, product, batch, weight, status..." style="width:100%; padding:6px 10px 6px 30px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
+            </div>
+            <button type="submit" style="padding:6px 14px; background:#f59e0b; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;"><i class="fa fa-search"></i> Search</button>
+            {% if query %}
+            <a href="{% url 'stock_search' %}" style="padding:6px 12px; background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"><i class="fa fa-times"></i> Clear</a>
+            {% endif %}
+        </form>
+
+        {% if query %}
+        <p style="margin-bottom:12px; color:#6b7280; font-size:14px;">
+            {{ packages|length }} result{{ packages|length|pluralize }} for "<strong>{{ query }}</strong>"
+        </p>
+        {% endif %}
+
+        <div class="table-wrapper" style="overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100%;">
+        <table class="staff-table" id="searchTable" style="min-width:600px; border-collapse:collapse; width:100%;">
+            <thead>
+                <tr>
+                    <th style="border:1px solid #d1d5db; padding:10px 12px; text-align:center; background:#f9fafb;">S/n</th>
+                    <th style="border:1px solid #d1d5db; padding:10px 12px; text-align:left; background:#f9fafb;">Barcode</th>
+                    <th style="border:1px solid #d1d5db; padding:10px 12px; text-align:left; background:#f9fafb;">Product Name</th>
+                    <th style="border:1px solid #d1d5db; padding:10px 12px; text-align:left; background:#f9fafb;">Weight (kg)</th>
+                    <th style="border:1px solid #d1d5db; padding:10px 12px; text-align:left; background:#f9fafb;">Selling Price</th>
+                    <th style="border:1px solid #d1d5db; padding:10px 12px; text-align:left; background:#f9fafb;">Batch No.</th>
+                    <th style="border:1px solid #d1d5db; padding:10px 12px; text-align:left; background:#f9fafb;">Status</th>
+                    <th style="border:1px solid #d1d5db; padding:10px 12px; text-align:left; background:#f9fafb;">Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pkg in packages %}
+                <tr>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px; text-align:center;">{{ forloop.counter }}</td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px;">{{ pkg.barcode_value }}</td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px;">{{ pkg.product_name|default:"-" }}</td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px;">{{ pkg.weight }}</td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px; font-weight:600;">TSh {{ pkg.selling_price|intcomma }}</td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px;">{{ pkg.batch_number|default:"-" }}</td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px;">
+                        {% if pkg.status == 'in_stock' %}
+                            <span class="status-active">In Stock</span>
+                        {% elif pkg.status == 'sold' %}
+                            <span class="status-inactive">Sold</span>
+                        {% elif pkg.status == 'damaged' %}
+                            <span style="color:#ea580c; font-weight:600;">Damaged</span>
+                        {% else %}
+                            <span style="color:#6b7280; font-weight:600;">Returned</span>
+                        {% endif %}
+                    </td>
+                    <td style="border:1px solid #d1d5db; padding:10px 12px; white-space:nowrap;">{{ pkg.created_at|date:"d M Y" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" style="border:1px solid #d1d5db; padding:30px; text-align:center; color:#9ca3af;">
+                        {% if query %}
+                            No matching stock found for "{{ query }}".
+                        {% else %}
+                            Enter a search term above to find stock items.
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+{% endblock %}

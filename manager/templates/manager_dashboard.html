@@ -1,0 +1,101 @@
+{% extends 'manager_base.html' %}
+{% load humanize %}
+
+{% block title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+{% block page_title %}Manager Dashboard{% endblock %}
+
+{% block content %}
+    <!-- Sales Stat Cards -->
+    <div class="cards">
+        <div class="card p1">
+            <h3>Total Sales</h3>
+            <h1>{{ total_sales|intcomma }}</h1>
+        </div>
+        <div class="card p2">
+            <h3>Total Revenue</h3>
+            <h1>TSh {{ total_revenue }}</h1>
+        </div>
+        <div class="card p3">
+            <h3>Today's Sales</h3>
+            <h1>{{ today_count }}</h1>
+        </div>
+        <div class="card p4">
+            <h3>Today's Revenue</h3>
+            <h1>TSh {{ today_revenue }}</h1>
+        </div>
+    </div>
+
+    <!-- Inventory Stat Cards -->
+    <div class="cards" style="margin-top: 15px;">
+        <div class="card p1">
+            <h3>Remain Stock</h3>
+            <h1>{{ total_stock|intcomma }}</h1>
+        </div>
+        <div class="card p2">
+            <h3>Stock Value Remained</h3>
+            <h1>TSh {{ in_stock_value }}</h1>
+        </div>
+        <div class="card p3">
+            <h3>Stock Sold</h3>
+            <h1>{{ sold|intcomma }}</h1>
+        </div>
+        <div class="card p4">
+            <h3>Sold Amount</h3>
+            <h1>TSh {{ sold_amount }}</h1>
+        </div>
+    </div>
+
+    <!-- Monthly Stats with Prev/Next Navigation -->
+    <div class="panel" style="margin-top: 20px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+            <h2 style="margin:0; font-size:18px;">Monthly Sales</h2>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <a href="?month={{ prev_month }}" style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:#f3f4f6; border:1px solid #d1d5db; border-radius:8px; text-decoration:none; color:#374151; font-size:14px;"><i class="fa fa-chevron-left"></i></a>
+                <span style="font-size:16px; font-weight:700; color:#1f2937; min-width:140px; text-align:center;">{{ month_name }}</span>
+                {% if not is_current_month %}
+                <a href="?month={{ next_month }}" style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:#f3f4f6; border:1px solid #d1d5db; border-radius:8px; text-decoration:none; color:#374151; font-size:14px;"><i class="fa fa-chevron-right"></i></a>
+                {% else %}
+                <span style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:8px; color:#d1d5db; font-size:14px;"><i class="fa fa-chevron-right"></i></span>
+                {% endif %}
+                {% if not is_current_month %}
+                <a href="{% url 'dashboard' %}" style="padding:6px 12px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;"><i class="fa fa-calendar"></i> Today</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="cards" style="margin-top: 0;">
+            <div class="card p1">
+                <h3>Monthly Sales</h3>
+                <h1>{{ month_count|intcomma }}</h1>
+            </div>
+            <div class="card p2">
+                <h3>Monthly Revenue</h3>
+                <h1>TSh {{ month_revenue }}</h1>
+            </div>
+            <div class="card p3">
+                <h3>Items Sold</h3>
+                <h1>{{ month_items_count|intcomma }}</h1>
+            </div>
+            <div class="card p4">
+                <h3>Avg Sale</h3>
+                <h1>TSh {{ month_avg }}</h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Cards -->
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; margin-top:20px;">
+        <a href="{% url 'manager_sales' %}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#f59e0b; color:#fff; border-radius:14px; text-decoration:none; box-shadow:0 4px 12px rgba(245,158,11,0.25); transition:transform 0.2s;">
+            <i class="fa fa-receipt" style="font-size:36px;"></i>
+            <span style="font-size:18px; font-weight:700;">View Sales</span>
+        </a>
+        <a href="{% url 'manager_stock' %}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#3b82f6; color:#fff; border-radius:14px; text-decoration:none; box-shadow:0 4px 12px rgba(59,130,246,0.25); transition:transform 0.2s;">
+            <i class="fa fa-boxes-stacked" style="font-size:36px;"></i>
+            <span style="font-size:18px; font-weight:700;">Manage Stock</span>
+        </a>
+        <a href="{% url 'staff' %}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#8b5cf6; color:#fff; border-radius:14px; text-decoration:none; box-shadow:0 4px 12px rgba(139,92,246,0.25); transition:transform 0.2s;">
+            <i class="fa fa-user-tie" style="font-size:36px;"></i>
+            <span style="font-size:18px; font-weight:700;">Manage Staff</span>
+        </a>
+    </div>
+{% endblock %}

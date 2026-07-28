@@ -1,0 +1,72 @@
+{% extends 'inventory_base.html' %}
+{% load humanize %}
+
+{% block content %}
+    {% if is_stock_person %}
+    <!-- Stock Person: 6 cards matching button sizes -->
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#f59e0b; color:#fff; border-radius:14px; box-shadow:0 4px 12px rgba(245,158,11,0.25);">
+            <i class="fa fa-boxes-stacked" style="font-size:36px;"></i>
+            <span style="font-size:14px; font-weight:600; opacity:0.9;">Total Stock</span>
+            <span style="font-size:32px; font-weight:800;">{{ total_stock }}</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#3b82f6; color:#fff; border-radius:14px; box-shadow:0 4px 12px rgba(59,130,246,0.25);">
+            <i class="fa fa-check-circle" style="font-size:36px;"></i>
+            <span style="font-size:14px; font-weight:600; opacity:0.9;">Stock Remaining</span>
+            <span style="font-size:32px; font-weight:800;">{{ stock_remaining }}</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#ef4444; color:#fff; border-radius:14px; box-shadow:0 4px 12px rgba(239,68,68,0.25);">
+            <i class="fa fa-truck-fast" style="font-size:36px;"></i>
+            <span style="font-size:14px; font-weight:600; opacity:0.9;">Stock Sold</span>
+            <span style="font-size:32px; font-weight:800;">{{ total_sold }}</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#059669; color:#fff; border-radius:14px; box-shadow:0 4px 12px rgba(5,150,105,0.25);">
+            <i class="fa fa-shilling-sign" style="font-size:36px;"></i>
+            <span style="font-size:14px; font-weight:600; opacity:0.9;">Remained Value</span>
+            <span style="font-size:24px; font-weight:800;">TSh {{ in_stock_value|intcomma }}</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#dc2626; color:#fff; border-radius:14px; box-shadow:0 4px 12px rgba(220,38,38,0.25);">
+            <i class="fa fa-money-bill-wave" style="font-size:36px;"></i>
+            <span style="font-size:14px; font-weight:600; opacity:0.9;">Sold Value</span>
+            <span style="font-size:24px; font-weight:800;">TSh {{ sold_amount|intcomma }}</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#2563eb; color:#fff; border-radius:14px; box-shadow:0 4px 12px rgba(37,99,235,0.25);">
+            <i class="fa fa-coins" style="font-size:36px;"></i>
+            <span style="font-size:14px; font-weight:600; opacity:0.9;">Total Value</span>
+            <span style="font-size:24px; font-weight:800;">TSh {{ total_value|intcomma }}</span>
+        </div>
+    </div>
+    {% else %}
+    <!-- General Stat Cards -->
+    <div class="cards">
+        <div class="card p1">
+            <h3>Total Stock</h3>
+            <h1>{{ total_stock }}</h1>
+        </div>
+        <div class="card p2">
+            <h3>In Stock Value</h3>
+            <h1>TSh {{ in_stock_value }}</h1>
+        </div>
+        <div class="card p3">
+            <h3>Stock Sold</h3>
+            <h1>{{ total_sold }}</h1>
+        </div>
+        <div class="card p4">
+            <h3>Sold Amount</h3>
+            <h1>TSh {{ sold_amount }}</h1>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Action Cards -->
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; margin-top:20px;">
+        <a href="{% url 'inventory_list' %}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#f59e0b; color:#fff; border-radius:14px; text-decoration:none; box-shadow:0 4px 12px rgba(245,158,11,0.25); transition:transform 0.2s;">
+            <i class="fa fa-plus" style="font-size:36px;"></i>
+            <span style="font-size:18px; font-weight:700;">Add Stock</span>
+        </a>
+        <a href="{% url 'stock_search' %}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 20px; background:#3b82f6; color:#fff; border-radius:14px; text-decoration:none; box-shadow:0 4px 12px rgba(59,130,246,0.25); transition:transform 0.2s;">
+            <i class="fa fa-magnifying-glass" style="font-size:36px;"></i>
+            <span style="font-size:18px; font-weight:700;">Stock Search</span>
+        </a>
+    </div>
+{% endblock %}

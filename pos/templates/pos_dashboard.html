@@ -1,0 +1,700 @@
+{% extends 'pos_base.html' %}
+
+{% block page_title %}POS Dashboard{% endblock %}
+
+{% block sidebar_nav %}
+<a class="active" href="{% url 'pos_dashboard' %}"><i class="fa fa-cash-register"></i> POS Dashboard</a>
+<a href="{% url 'sales_list' %}"><i class="fa fa-receipt"></i> Sales</a>
+<a href="{% url 'pos_stock_lookup' %}"><i class="fa fa-boxes-stacked"></i> Stock Lookup</a>
+<a href="{% url 'expenditure_list' %}"><i class="fa fa-money-bill-wave"></i> Expenditures</a>
+<a href="{% url 'funga_hesabu' %}"><i class="fa fa-lock"></i> Funga Hesabu</a>
+{% endblock %}
+
+{% block content %}
+    <!-- Desktop: Stat Cards -->
+    <div class="cards" id="posStats">
+        <div class="card p1">
+            <h3>Total Sales</h3>
+            <h1>{{ total_sales }}</h1>
+        </div>
+        <div class="card p2">
+            <h3>Total Revenue</h3>
+            <h1>TSh {{ total_revenue }}</h1>
+        </div>
+        <div class="card p3">
+            <h3>Today's Sales</h3>
+            <h1>{{ today_count }}</h1>
+        </div>
+        <div class="card p4">
+            <h3>Today's Revenue</h3>
+            <h1>TSh {{ today_revenue }}</h1>
+        </div>
+    </div>
+
+    <!-- Mobile: Big Scan Button -->
+    <div id="mobileScanHome" style="display:none; flex-direction:column; align-items:center; justify-content:center; min-height:70vh; gap:24px;">
+        <button onclick="openSaleModal()" style="width:200px; height:200px; border-radius:50%; background:#f59e0b; border:none; color:#fff; font-size:72px; cursor:pointer; box-shadow:0 8px 24px rgba(245,158,11,0.4); transition:transform 0.2s;">
+            <i class="fa fa-barcode"></i>
+        </button>
+        <h2 style="color:#1f2937; font-size:22px;">Tap to Start Scanning</h2>
+    </div>
+
+    <!-- Recent Sales -->
+    <div class="grid" style="grid-template-columns: 1fr;" id="recentSalesSection">
+        <div class="panel">
+            <div class="section-header">
+                <h2>Recent Sales</h2>
+                <button class="btn-add" onclick="openSaleModal()">
+                    <i class="fa fa-plus"></i> New Sale
+                </button>
+            </div>
+            <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <table class="staff-table" id="salesTable" style="min-width: 700px;">
+                <thead>
+                    <tr>
+                        <th>Receipt #</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Payment</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in recent_sales %}
+                    <tr>
+                        <td>{{ sale.receipt_number }}</td>
+                        <td>{{ sale.items.count }} item{{ sale.items.count|pluralize }}</td>
+                        <td>TSh {{ sale.total_amount|floatformat:0 }}</td>
+                        <td>{{ sale.get_payment_method_display }}</td>
+                        <td>{{ sale.sale_date|date:"d M Y, H:i" }}</td>
+                        <td>
+                            <button class="btn-action" onclick="viewReceipt({{ sale.id }})" title="View receipt"><i class="fa fa-receipt"></i></button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: #9ca3af; padding: 30px;">No sales yet. Click "New Sale" to start.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating New Sale Button (Mobile) -->
+    <button class="fab" onclick="openSaleModal()" id="fabNewSale">
+        <i class="fa fa-plus"></i>
+    </button>
+
+    <!-- Scanner Modal (Supermarket style - opens directly) -->
+    <div class="modal-overlay" id="saleModal" style="z-index: 1001;">
+        <div class="modal" style="max-width: 420px;">
+            <h2><i class="fa fa-barcode"></i> Scan Barcode</h2>
+            <div style="width: 100%; border-radius: 12px 12px 0 0; overflow: hidden; background: #000; aspect-ratio: 4/3;">
+                <div id="scannerVideo" style="width: 100%; height: 100%;"></div>
+            </div>
+            <div id="scannerStatus" style="text-align:center; padding:20px 16px; font-size:18px; font-weight:700; color:#1f2937; background:#f9fafb; border-radius:0 0 12px 12px; min-height:70px; display:flex; align-items:center; justify-content:center; transition: background 0.3s, color 0.3s;">
+                Point camera at barcode...
+            </div>
+            <div id="cartBadge" style="display:none; text-align:center; background:#f0fdf4; color:#059669; font-weight:700; padding:8px; border-radius:8px; margin-top:12px; font-size:14px;"></div>
+            <div class="modal-actions" style="justify-content: space-between; margin-top:16px;">
+                <button type="button" class="btn-secondary" onclick="closeSaleModal()">Cancel</button>
+                <button type="button" class="btn-primary" onclick="showCheckout()" style="font-size:16px; padding:12px 24px;"><i class="fa fa-shopping-cart"></i> Checkout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div class="modal-overlay" id="receiptModal">
+        <div class="modal" style="max-width: 380px;">
+            <h2>Receipt</h2>
+            <div id="receiptContent" style="font-family: monospace; font-size: 13px; line-height: 1.6; background:#fff; border:1px dashed #d1d5db; border-radius:8px; padding:16px; margin-bottom:16px;">
+            </div>
+            <div class="modal-actions" style="justify-content: center;">
+                <button type="button" class="btn-secondary" onclick="closeReceiptModal()">Close</button>
+                <button type="button" class="btn-primary" onclick="printReceiptContent()"><i class="fa fa-print"></i> Print</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Modal (after scan - supermarket style) -->
+    <div class="modal-overlay" id="checkoutModal">
+        <div class="modal" style="max-width: 400px;">
+            <h2><i class="fa fa-shopping-cart"></i> Checkout</h2>
+            <div id="checkoutItems" style="margin-bottom: 16px;"></div>
+            <div style="border-top: 2px solid #e5e7eb; padding-top: 14px; margin-bottom: 16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:18px; font-weight:700; color:#1f2937;">Total:</span>
+                    <span id="checkoutTotal" style="font-size:24px; font-weight:800; color:#059669;">TSh 0 /=</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Payment Method</label>
+                <div id="paymentButtons" style="display:flex; gap:8px;">
+                    <button type="button" class="pay-btn active" data-method="cash" onclick="selectPayment('cash')"><i class="fa fa-money-bill"></i> Cash</button>
+                    <button type="button" class="pay-btn" data-method="mobile" onclick="selectPayment('mobile')"><i class="fa fa-mobile-screen"></i> Mobile</button>
+                    <button type="button" class="pay-btn" data-method="card" onclick="selectPayment('card')"><i class="fa fa-credit-card"></i> Card</button>
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: space-between; align-items: center;">
+                <button type="button" class="btn-secondary" onclick="cancelCheckout()"><i class="fa fa-arrow-left"></i> Back to Scan</button>
+                <button type="button" class="btn-primary" onclick="completeSale()" style="font-size:16px; padding:12px 24px;"><i class="fa fa-check"></i> Complete Sale</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+    let html5QrcodeScanner = null;
+    let cart = [];
+    let selectedPayment = 'cash';
+    let lastScannedCode = null;
+    let scanCooldown = false;
+
+    // ---- Bluetooth Printer ----
+    let printerDevice = null;
+    let printerCharacteristic = null;
+    let printerOnline = false;
+    let printerReconnecting = false;
+
+    const PRINTER_SERVICE_UUIDS = [
+        '000018f0-0000-1000-8000-00805f9b34fb',
+        '00001101-0000-1000-8000-00805f9b34fb',
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+    ];
+    const PRINTER_CHAR_UUIDS = [
+        '00002af1-0000-1000-8000-00805f9b34fb',
+        '000018f0-0000-1000-8000-00805f9b34fb',
+        '49535343-8841-43f4-a8d4-ecbe34729bb3',
+    ];
+
+    async function connectPrinter() {
+        if (!navigator.bluetooth) {
+            Swal.fire('Not Supported', 'Web Bluetooth is not available on this device.', 'error');
+            return false;
+        }
+        try {
+            Swal.fire({ title: 'Pairing...', text: 'Select your Bluetooth thermal printer', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            printerDevice = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: PRINTER_SERVICE_UUIDS,
+            });
+
+            const server = await printerDevice.gatt.connect();
+
+            for (const svcUuid of PRINTER_SERVICE_UUIDS) {
+                try {
+                    const service = await server.getPrimaryService(svcUuid);
+                    for (const charUuid of PRINTER_CHAR_UUIDS) {
+                        try {
+                            printerCharacteristic = await service.getCharacteristic(charUuid);
+                            break;
+                        } catch(e) {}
+                    }
+                    if (printerCharacteristic) break;
+                } catch(e) {}
+            }
+
+            if (!printerCharacteristic) {
+                const services = await server.getPrimaryServices();
+                for (const svc of services) {
+                    const chars = await svc.getCharacteristics();
+                    for (const ch of chars) {
+                        if (ch.properties.write || ch.properties.writeWithoutResponse) {
+                            printerCharacteristic = ch;
+                            break;
+                        }
+                    }
+                    if (printerCharacteristic) break;
+                }
+            }
+
+            if (!printerCharacteristic) throw new Error('No writable characteristic found');
+
+            printerDevice.addEventListener('gattserverdisconnected', async () => {
+                if (printerReconnecting) return;
+                printerReconnecting = true;
+                printerOnline = false;
+                // Try silent reconnect (may fail without user gesture)
+                try {
+                    console.log('Printer disconnected, attempting auto-reconnect...');
+                    await printerDevice.gatt.connect();
+                    printerOnline = true;
+                    console.log('Printer reconnected automatically');
+                } catch (err) {
+                    console.log('Auto-reconnect failed, will prompt on next print:', err.message);
+                }
+                printerReconnecting = false;
+            });
+
+            printerOnline = true;
+
+            // Store pairing info
+            if (printerDevice.id) {
+                localStorage.setItem('printer_id', printerDevice.id);
+                localStorage.setItem('printer_name', printerDevice.name || 'Thermal Printer');
+            }
+
+            Swal.fire('Connected!', 'Bluetooth printer paired and connected.', 'success');
+            return true;
+        } catch (err) {
+            Swal.fire('Connection Failed', err.message || 'Could not connect to printer.', 'error');
+            return false;
+        }
+    }
+
+    async function reconnectPrinter() {
+        const savedId = localStorage.getItem('printer_id');
+        if (!savedId || !navigator.bluetooth) return false;
+        try {
+            // Web Bluetooth doesn't allow silent reconnect by ID in most browsers
+            // But we can try getAvailability and prompt if needed
+            return printerOnline;
+        } catch(e) {
+            return false;
+        }
+    }
+
+    async function ensurePrinter() {
+        if (printerOnline && printerDevice && printerDevice.gatt.connected) return true;
+        // Try to reconnect if we have a saved pairing
+        const savedId = localStorage.getItem('printer_id');
+        if (savedId) {
+            // Device was paired before, prompt to reconnect
+            const r = await Swal.fire({
+                title: 'Reconnect Printer',
+                text: 'Connect to your paired printer?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Connect',
+                cancelButtonText: 'Skip'
+            });
+            if (r.isConfirmed) {
+                return await connectPrinter();
+            }
+        } else {
+            const r = await Swal.fire({
+                title: 'Pair Printer',
+                text: 'Connect a Bluetooth thermal printer to print receipts?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Pair',
+                cancelButtonText: 'Skip'
+            });
+            if (r.isConfirmed) {
+                return await connectPrinter();
+            }
+        }
+        return false;
+    }
+
+    async function printReceiptViaBluetooth(receiptData) {
+        try {
+            Swal.fire({ title: 'Printing receipt...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const enc = new TextEncoder();
+            const cmds = [
+                [0x1B, 0x40],
+                [0x1B, 0x61, 0x01],
+                [0x1B, 0x21, 0x10],
+                ...enc.encode('Arusha Mchele Loft\n'),
+                [0x1B, 0x21, 0x00],
+                ...enc.encode('Sales & Inventory System\n'),
+                ...enc.encode('Tel: +255 700 000 000\n'),
+                ...enc.encode('--------------------------------\n'),
+                [0x1B, 0x61, 0x00],
+                ...enc.encode('Receipt: ' + receiptData.receipt_number + '\n'),
+                ...enc.encode('Date: ' + receiptData.sale_date + '\n'),
+                ...enc.encode('Served by: ' + receiptData.sold_by + '\n'),
+                ...enc.encode('--------------------------------\n'),
+            ];
+            receiptData.items.forEach(item => {
+                cmds.push(...enc.encode(item.product_name + ' (' + item.weight + 'kg)\n'));
+                cmds.push(...enc.encode('  ' + item.barcode + '\n'));
+                cmds.push([0x1B, 0x61, 0x02]);
+                cmds.push(...enc.encode(item.price_formatted + '\n'));
+                cmds.push([0x1B, 0x61, 0x00]);
+            });
+            cmds.push(
+                ...enc.encode('--------------------------------\n'),
+                [0x1B, 0x21, 0x10],
+                [0x1B, 0x61, 0x02],
+                ...enc.encode('Total: ' + receiptData.total_amount + '\n'),
+                [0x1B, 0x21, 0x00],
+                [0x1B, 0x61, 0x00],
+                ...enc.encode('--------------------------------\n'),
+                ...enc.encode('Payment: ' + receiptData.payment_method + '\n'),
+                ...enc.encode('\n'),
+                [0x1B, 0x61, 0x01],
+                ...enc.encode('Thank you for your business!\n'),
+                ...enc.encode('Goods sold are not returnable.\n'),
+                [0x0A, 0x0A, 0x0A],
+                [0x1D, 0x56, 0x42, 0x00],
+            );
+            const data = new Uint8Array(cmds.flat());
+            const CHUNK = 180;
+            for (let i = 0; i < data.length; i += CHUNK) {
+                const chunk = data.slice(i, i + CHUNK);
+                if (printerCharacteristic.properties.writeWithoutResponse) {
+                    await printerCharacteristic.writeValueWithoutResponse(chunk);
+                } else {
+                    await printerCharacteristic.writeValueWithResponse(chunk);
+                }
+            }
+            Swal.fire('Printed!', 'Receipt printed successfully.', 'success');
+        } catch (err) {
+            Swal.fire('Print Failed', err.message || 'Could not print receipt.', 'error');
+        }
+    }
+
+    // ---- Beep sound ----
+    function beep() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 880;
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.15);
+        } catch(e) {}
+    }
+
+    function errorBeep() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 220;
+            osc.type = 'square';
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.3);
+        } catch(e) {}
+    }
+
+    // ---- Scanner Modal ----
+    async function openSaleModal() {
+        cart = [];
+        document.getElementById('cartBadge').style.display = 'none';
+        document.getElementById('saleModal').classList.add('show');
+        document.getElementById('scannerStatus').textContent = 'Starting camera...';
+        await startScanner();
+    }
+
+    async function startScanner() {
+        try {
+            html5QrcodeScanner = new Html5Qrcode('scannerVideo', {
+                verbose: false,
+            });
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 250, height: 150 }, 
+                aspectRatio: 3/4,
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                ],
+            };
+            await html5QrcodeScanner.start(
+                { facingMode: 'environment' },
+                config,
+                onScanSuccess,
+                () => {}
+            );
+            document.getElementById('scannerStatus').textContent = 'Point camera at barcode...';
+        } catch (err) {
+            document.getElementById('scannerStatus').textContent = 'Camera error: ' + (err.message || err);
+            console.error('Scanner error:', err);
+        }
+    }
+
+    async function onScanSuccess(decodedText) {
+        if (scanCooldown) return;
+        scanCooldown = true;
+        lastScannedCode = decodedText;
+        beep();
+        document.getElementById('scannerStatus').textContent = 'Scanned: ' + decodedText;
+        await lookupAndAddToCart(decodedText);
+        setTimeout(() => { scanCooldown = false; lastScannedCode = null; }, 2000);
+    }
+
+    async function closeSaleModal() {
+        await stopScanner();
+        document.getElementById('saleModal').classList.remove('show');
+        cart = [];
+    }
+
+    async function stopScanner() {
+        if (html5QrcodeScanner) {
+            try { await html5QrcodeScanner.stop(); html5QrcodeScanner.clear(); } catch(e) {}
+            html5QrcodeScanner = null;
+        }
+    }
+
+    // ---- Cart ----
+    async function lookupAndAddToCart(barcode) {
+        try {
+            const res = await fetch(`{% url 'search_barcode' %}?barcode=${encodeURIComponent(barcode)}`);
+            const data = await res.json();
+
+            if (data.success) {
+                if (data.status !== 'in_stock') {
+                    errorBeep();
+                    document.getElementById('scannerStatus').textContent = `Not available: ${data.status_display}`;
+                    document.getElementById('scannerStatus').style.background = '#ef4444';
+                    document.getElementById('scannerStatus').style.color = '#ffffff';
+                    document.getElementById('scannerStatus').style.fontSize = '20px';
+                    setTimeout(() => {
+                        document.getElementById('scannerStatus').style.background = '#f9fafb';
+                        document.getElementById('scannerStatus').style.color = '#1f2937';
+                        document.getElementById('scannerStatus').style.fontSize = '18px';
+                    }, 2000);
+                    return;
+                }
+                // Check if already in cart
+                if (cart.find(item => item.barcode === barcode)) {
+                    errorBeep();
+                    document.getElementById('scannerStatus').textContent = 'Already in cart!';
+                    document.getElementById('scannerStatus').style.background = '#ef4444';
+                    document.getElementById('scannerStatus').style.color = '#ffffff';
+                    document.getElementById('scannerStatus').style.fontSize = '20px';
+                    setTimeout(() => {
+                        document.getElementById('scannerStatus').style.background = '#f9fafb';
+                        document.getElementById('scannerStatus').style.color = '#1f2937';
+                        document.getElementById('scannerStatus').style.fontSize = '18px';
+                    }, 2000);
+                    return;
+                }
+                cart.push({
+                    barcode: data.barcode,
+                    product_name: data.product_name || '-',
+                    weight: data.weight,
+                    price: parseFloat(data.price),
+                    price_formatted: data.price_formatted,
+                });
+                const total = cart.reduce((sum, item) => sum + item.price, 0);
+                document.getElementById('cartBadge').style.display = 'block';
+                document.getElementById('cartBadge').textContent = `${cart.length} item${cart.length > 1 ? 's' : ''} in cart · TSh ${total.toLocaleString('en-US', {maximumFractionDigits:0})} /=`;
+                document.getElementById('scannerStatus').textContent = `Added: ${data.product_name || data.barcode} - ${data.price_formatted}`;
+                document.getElementById('scannerStatus').style.background = '#22c55e';
+                    document.getElementById('scannerStatus').style.color = '#ffffff';
+                    document.getElementById('scannerStatus').style.fontSize = '20px';
+                    setTimeout(() => {
+                        document.getElementById('scannerStatus').style.background = '#f9fafb';
+                        document.getElementById('scannerStatus').style.color = '#1f2937';
+                        document.getElementById('scannerStatus').style.fontSize = '18px';
+                    }, 1000);
+            } else {
+                errorBeep();
+                document.getElementById('scannerStatus').textContent = data.message;
+                document.getElementById('scannerStatus').style.background = '#ef4444';
+                document.getElementById('scannerStatus').style.color = '#ffffff';
+                document.getElementById('scannerStatus').style.fontSize = '20px';
+                setTimeout(() => {
+                    document.getElementById('scannerStatus').style.background = '#f9fafb';
+                    document.getElementById('scannerStatus').style.color = '#1f2937';
+                    document.getElementById('scannerStatus').style.fontSize = '18px';
+                }, 2000);
+            }
+        } catch (err) {
+            errorBeep();
+            document.getElementById('scannerStatus').textContent = 'Lookup error';
+            document.getElementById('scannerStatus').style.background = '#ef4444';
+            document.getElementById('scannerStatus').style.color = '#ffffff';
+            document.getElementById('scannerStatus').style.fontSize = '20px';
+            setTimeout(() => {
+                document.getElementById('scannerStatus').style.background = '#f9fafb';
+                document.getElementById('scannerStatus').style.color = '#1f2937';
+                document.getElementById('scannerStatus').style.fontSize = '18px';
+            }, 2000);
+        }
+    }
+
+    // ---- Checkout ----
+    function showCheckout() {
+        if (cart.length === 0) {
+            Swal.fire('Empty Cart', 'Scan at least one barcode first', 'warning');
+            return;
+        }
+        stopScanner();
+
+        // Render cart items
+        let html = '';
+        let total = 0;
+        cart.forEach((item, i) => {
+            total += item.price;
+            html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f3f4f6;">
+                    <div>
+                        <div style="font-weight:600; color:#1f2937; font-size:14px;">${item.product_name}</div>
+                        <div style="font-size:12px; color:#6b7280;">${item.barcode} · ${item.weight} kg</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:700; color:#059669;">${item.price_formatted}</div>
+                        <button type="button" onclick="removeFromCart(${i})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px; margin-top:2px;"><i class="fa fa-trash"></i> Remove</button>
+                    </div>
+                </div>
+            `;
+        });
+        document.getElementById('checkoutItems').innerHTML = html;
+        document.getElementById('checkoutTotal').textContent = 'TSh ' + total.toLocaleString('en-US', {maximumFractionDigits:0}) + ' /=';
+
+        document.getElementById('saleModal').classList.remove('show');
+        document.getElementById('checkoutModal').classList.add('show');
+    }
+
+    function removeFromCart(index) {
+        cart.splice(index, 1);
+        if (cart.length === 0) {
+            cancelCheckout();
+            return;
+        }
+        showCheckout();
+    }
+
+    function cancelCheckout() {
+        document.getElementById('checkoutModal').classList.remove('show');
+        document.getElementById('saleModal').classList.add('show');
+        startScanner();
+    }
+
+    function selectPayment(method) {
+        selectedPayment = method;
+        document.querySelectorAll('.pay-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.method === method);
+        });
+    }
+
+    function getCSRFToken() {
+        const cookie = document.cookie.match(/csrftoken=([^;]+)/);
+        return cookie ? cookie[1] : '';
+    }
+
+    async function completeSale() {
+        if (cart.length === 0) return;
+
+        Swal.fire({ title: 'Processing sale...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        try {
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+            formData.append('payment_method', selectedPayment);
+            cart.forEach(item => formData.append('barcodes', item.barcode));
+
+            const res = await fetch('{% url "create_sale" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': getCSRFToken() },
+            });
+            const data = await res.json();
+            if (!data.success) {
+                Swal.fire('Sale Failed', data.message, 'error');
+                return;
+            }
+
+            // Auto-print receipt via Bluetooth
+            const printerReady = await ensurePrinter();
+            if (printerReady) {
+                await printReceiptViaBluetooth(data);
+            } else {
+                Swal.fire({
+                    title: 'Sale Complete!',
+                    html: `<b>Receipt:</b> ${data.receipt_number}<br><b>Items:</b> ${data.items.length}<br><b>Total:</b> ${data.total_amount}`,
+                    icon: 'success'
+                });
+            }
+
+            document.getElementById('checkoutModal').classList.remove('show');
+            cart = [];
+
+            setTimeout(() => location.reload(), 2500);
+        } catch (err) {
+            Swal.fire('Error', 'Could not complete sale', 'error');
+        }
+    }
+
+    function closeReceiptModal() {
+        document.getElementById('receiptModal').classList.remove('show');
+    }
+
+    async function viewReceipt(saleId) {
+        try {
+            const res = await fetch(`{% url 'get_sale' 0 %}`.replace('0', saleId));
+            const data = await res.json();
+            showReceipt(data);
+        } catch (err) {
+            Swal.fire('Error', 'Could not load receipt', 'error');
+        }
+    }
+
+    function showReceipt(data) {
+        let itemsHtml = '';
+        data.items.forEach(item => {
+            itemsHtml += `
+                <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;">
+                    <div>
+                        <div>${item.product_name || '-'}</div>
+                        <div style="color:#6b7280; font-size:11px;">${item.barcode} · ${item.weight} kg</div>
+                    </div>
+                    <div style="font-weight:700;">${item.price_formatted}</div>
+                </div>
+            `;
+        });
+        const html = `
+            <div style="text-align:center; border-bottom:1px dashed #d1d5db; padding-bottom:10px; margin-bottom:10px;">
+                <strong style="font-size:16px;">Arusha Mchele Loft</strong><br>
+                <span style="font-size:11px; color:#6b7280;">Sales & Inventory System</span><br>
+                <span style="font-size:11px; color:#6b7280;">Tel: +255 700 000 000</span>
+            </div>
+            <div style="margin-bottom:10px;">
+                <strong>Receipt #:</strong> ${data.receipt_number}<br>
+                <strong>Date:</strong> ${data.sale_date}<br>
+                <strong>Served by:</strong> ${data.sold_by}
+            </div>
+            <div style="border-top:1px dashed #d1d5db; border-bottom:1px dashed #d1d5db; padding:8px 0; margin-bottom:10px;">
+                ${itemsHtml}
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:14px; font-weight:700;">
+                <span>Total:</span>
+                <span>${data.total_amount}</span>
+            </div>
+            <div style="margin-bottom:10px;">
+                <strong>Payment:</strong> ${data.payment_method}
+            </div>
+            <div style="text-align:center; border-top:1px dashed #d1d5db; padding-top:10px; font-size:11px; color:#6b7280;">
+                Thank you for your business!<br>
+                Goods sold are not returnable.
+            </div>
+        `;
+        document.getElementById('receiptContent').innerHTML = html;
+        document.getElementById('receiptModal').classList.add('show');
+    }
+
+    function printReceiptContent() {
+        const content = document.getElementById('receiptContent').innerHTML;
+        const w = window.open('', '', 'width=380,height=600');
+        w.document.write(`<html><head><title>Receipt</title><style>body{font-family:monospace;font-size:13px;padding:16px;}</style></head><body>${content}</body></html>`);
+        w.document.close();
+        w.focus();
+        w.print();
+        w.close();
+    }
+</script>
+{% endblock %}

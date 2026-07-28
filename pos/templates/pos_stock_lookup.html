@@ -1,0 +1,145 @@
+{% extends 'pos_base.html' %}
+{% load humanize %}
+
+{% block page_title %}Stock Lookup{% endblock %}
+
+{% block sidebar_nav %}
+<a href="{% url 'pos_dashboard' %}"><i class="fa fa-cash-register"></i> POS Dashboard</a>
+<a href="{% url 'sales_list' %}"><i class="fa fa-receipt"></i> Sales</a>
+<a class="active" href="{% url 'pos_stock_lookup' %}"><i class="fa fa-boxes-stacked"></i> Stock Lookup</a>
+<a href="{% url 'expenditure_list' %}"><i class="fa fa-money-bill-wave"></i> Expenditures</a>
+<a href="{% url 'funga_hesabu' %}"><i class="fa fa-lock"></i> Funga Hesabu</a>
+{% endblock %}
+
+{% block content %}
+    <div class="panel">
+        <div class="section-header">
+            <h2>Stock Lookup</h2>
+        </div>
+
+        <!-- Filters -->
+        <form method="GET" action="{% url 'pos_stock_lookup' %}" id="lookupForm" style="display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; justify-content:center;">
+            <div>
+                <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:5px;">Search</label>
+                <div style="position:relative;">
+                    <i class="fa fa-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9ca3af; font-size:14px;"></i>
+                    <input type="text" name="search" id="searchInput" value="{{ search }}" placeholder="Barcode or product..." style="padding:10px 14px 10px 34px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; min-width:220px;">
+                </div>
+            </div>
+            <div>
+                <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:5px;">Product Name</label>
+                <select name="product_name" id="productSelect" style="padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; min-width:220px;">
+                    <option value="">All Products</option>
+                    {% for pn in product_names %}
+                        <option value="{{ pn }}" {% if product_name == pn %}selected{% endif %}>{{ pn }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:5px;">Weight (kg)</label>
+                <select name="weight" id="weightSelect" style="padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; min-width:180px;">
+                    <option value="">All Weights</option>
+                    {% for w in weights %}
+                        <option value="{{ w }}" {% if weight == w|stringformat:"s" %}selected{% endif %}>{{ w }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" style="padding:10px 20px; background:#f59e0b; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;"><i class="fa fa-search"></i> Search</button>
+            {% if product_name or weight or search %}
+            <a href="{% url 'pos_stock_lookup' %}" style="padding:10px 16px; background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"><i class="fa fa-times"></i> Clear</a>
+            {% endif %}
+        </form>
+
+        <!-- Totals -->
+        <div style="display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap; justify-content:center;">
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+                <i class="fa fa-box" style="color:#059669; font-size:28px;"></i>
+                <div>
+                    <div style="font-size:13px; color:#6b7280;">In Stock</div>
+                    <div style="font-size:26px; font-weight:800; color:#059669;">{{ in_stock_count|intcomma }}</div>
+                </div>
+            </div>
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:16px 28px; display:flex; align-items:center; gap:12px; min-width:200px;">
+                <i class="fa fa-boxes-stacked" style="color:#2563eb; font-size:28px;"></i>
+                <div>
+                    <div style="font-size:13px; color:#6b7280;">Total Items</div>
+                    <div style="font-size:26px; font-weight:800; color:#2563eb;">{{ total_count|intcomma }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100%;">
+        <table class="staff-table" style="min-width:600px; border-collapse:collapse; width:100%;">
+            <thead>
+                <tr>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:center; background:#f9fafb;">S/n</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Barcode</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Product Name</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Weight (kg)</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Selling Price</th>
+                    <th style="border:1px solid #d1d5db; padding:8px 10px; text-align:left; background:#f9fafb;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pkg in packages %}
+                <tr>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; text-align:center;">{{ forloop.counter }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ pkg.barcode_value }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ pkg.product_name|default:"-" }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">{{ pkg.weight }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px; font-weight:600;">TSh {{ pkg.selling_price|intcomma }}</td>
+                    <td style="border:1px solid #d1d5db; padding:8px 10px;">
+                        {% if pkg.status == 'in_stock' %}
+                            <span class="status-active">In Stock</span>
+                        {% elif pkg.status == 'sold' %}
+                            <span class="status-inactive">Sold</span>
+                        {% elif pkg.status == 'damaged' %}
+                            <span style="color:#ea580c; font-weight:600;">Damaged</span>
+                        {% else %}
+                            <span style="color:#6b7280; font-weight:600;">Returned</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="border:1px solid #d1d5db; padding:24px; text-align:center; color:#9ca3af;">
+                        No stock items found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:16px; flex-wrap:wrap;">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}&search={{ search }}&product_name={{ product_name }}&weight={{ weight }}" style="padding:6px 12px; background:#f3f4f6; border:1px solid #d1d5db; border-radius:6px; text-decoration:none; color:#374151; font-size:13px; font-weight:600;"><i class="fa fa-chevron-left"></i> Prev</a>
+            {% endif %}
+            <span style="padding:6px 14px; background:#f59e0b; color:#fff; border-radius:6px; font-size:13px; font-weight:700;">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}&search={{ search }}&product_name={{ product_name }}&weight={{ weight }}" style="padding:6px 12px; background:#f3f4f6; border:1px solid #d1d5db; border-radius:6px; text-decoration:none; color:#374151; font-size:13px; font-weight:600;">Next <i class="fa fa-chevron-right"></i></a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Auto-submit on dropdown change
+        document.getElementById('productSelect').addEventListener('change', function() {
+            document.getElementById('lookupForm').submit();
+        });
+        document.getElementById('weightSelect').addEventListener('change', function() {
+            document.getElementById('lookupForm').submit();
+        });
+        // Auto-search with debounce on text input
+        let searchTimer;
+        document.getElementById('searchInput').addEventListener('input', function() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                document.getElementById('lookupForm').submit();
+            }, 800);
+        });
+    </script>
+{% endblock %}
